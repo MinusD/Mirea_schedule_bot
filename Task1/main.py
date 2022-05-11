@@ -18,6 +18,7 @@ def main():
                 random_id=get_random_id(),
                 message='Привет, ' + vk.users.get(user_id=event.user_id)[0]['first_name']
             )
+            # break
 
 
 if __name__ == '__main__':
