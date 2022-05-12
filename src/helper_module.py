@@ -14,7 +14,7 @@ class Debug:
     def __init__(self, data: any = '', is_log: bool = True, key: str = 'LOG'):
         if cfg.DEBUG_MODE:
             print(data)
-        if cfg.LOG_MODE:
+        if cfg.LOG_MODE and is_log:
             with open(cfg.LOG_FILENAME, 'a') as f:
                 f.write(f'{key} --- {str(datetime.datetime.now())} --- {data}\n')
                 # f.write(f'{key} --- {str(datetime.datetime.now())[:-7]} --- {comment}\n')
