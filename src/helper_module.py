@@ -1,11 +1,11 @@
 import datetime
-from src.cfgs import vk_config as cfg
+from src.cfgs import system_config as cfg
 
 
 class Log:
     def __init__(self, key: str = 'LOG', comment: str = '') -> None:
         if cfg.LOG_MODE:
-            with open(cfg.LOG_FILENAME, 'a') as f:
+            with open(cfg.DATA_DIR + cfg.LOG_FILENAME, 'a') as f:
                 f.write(f'{key} --- {str(datetime.datetime.now())} --- {comment}\n')
                 # f.write(f'{key} --- {str(datetime.datetime.now())[:-7]} --- {comment}\n')
 

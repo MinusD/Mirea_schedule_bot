@@ -3,3 +3,10 @@ DEBUG_MODE: bool = True
 LOG_MODE: bool = True
 LOG_FILENAME: str = 'log.txt'
 ADMIN_VK_ID: int = 382889632
+
+TABLE_NAME = 'groups'
+
+
+DATABASE_FILENAME: str = 'vk_bot_data.db'
+MAIN_DIR: str = 'src/'
+DATA_DIR: str = 'data/'

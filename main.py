@@ -10,21 +10,24 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.utils import get_random_id
 
 # Самописные модули
-from src.vk_client import *
 from src.helper_module import *
+from src.sql_database import *
 
 import src.cfgs.main_config as cfg
-import src.cfgs.vk_config as vkcfg
+import src.cfgs.system_config as scfg
 
 
 class VkBot:
     def __init__(self) -> None:
-        self.vk_session = vk_api.VkApi(token=vkcfg.TOKEN)
+        self.vk_session = vk_api.VkApi(token=scfg.TOKEN)
         self.vk = self.vk_session.get_api()
         self.longpoll = VkLongPoll(self.vk_session)
         self.users_to_set_group: set = set()
         Debug('Bot init', key='SRT')
 
+        self.users_to_set_group.add('707879525')
+
+    # Начинаем слушать ивенты
     def start_listen(self) -> None:
         Debug('Start listen', key='SRT')
         for event in self.longpoll.listen():
@@ -48,14 +51,18 @@ class VkBot:
                 return
         if str(user_id) in self.users_to_set_group:
             self._edit_user_group(user_id, text)
-        print(self.users_to_set_group)
+        # print(self.users_to_set_group)
 
     def _edit_user_group(self, user_id: int, group_slug: str) -> None:
-        group_pattern = r'\w{4}-\d{2}-\d{2}'
+        group_pattern = r'\w{4}-\d{2}-\d{2}'  # Паттерн группы
         group_slug = group_slug.upper()
         if re.match(group_pattern, group_slug):
-            print('correct')
-            pass
+            db = Database()
+            if not db.fetch_one(table=scfg.TABLE_NAME, condition=f'user_id = {user_id}'):
+                db.insert_one(table=scfg.TABLE_NAME, data=[user_id, group_slug])
+                Debug(f'Set user group: {group_slug} uid: {user_id}', key='SET')
+            else:
+                db.update_one(table=scfg.TABLE_NAME, sets=f'group_slug = \'{group_slug}\'', condition=f'user_id = {user_id}')
         else:
             self._send_message(user_id, cfg.INVALID_GROUP_TEXT)
         print(group_slug)
