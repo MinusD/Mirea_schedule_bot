@@ -1,4 +1,6 @@
 # Встроенные библиотеки
+import datetime
+import openpyxl
 import requests
 import time
 import re
@@ -25,26 +27,41 @@ class VkBot:
         self.longpoll = VkLongPoll(self.vk_session)
         self.users_to_set_group: set = set()
         self.last_schedule_file_update: time
+        self.schedule_data: list
         self._update_schedule_file()
+
         Debug('Bot init', key='SRT')
 
-        # self.users_to_set_group.add('707879525')
-
-    # Начинаем слушать ивенты
     def start_listen(self) -> None:
+        """
+        Слушатель событий вк
+
+        :return:
+        """
         Debug('Start listen', key='SRT')
         for event in self.longpoll.listen():
             if event.type == VkEventType.MESSAGE_NEW and event.text and event.to_me:
                 Debug('from {} text = \'{}\''.format(event.user_id, event.text), key='MSG')
                 self._command_handler(event.user_id, event.text.lower())
 
-    # Добавляет пользователя в список обновления группы
-    def _add_user_to_edit_group_list(self, user_id):
+    def _add_user_to_edit_group_list(self, user_id) -> None:
+        """
+        Добавляет пользователя в список обновления группы
+
+        :param user_id:
+        :return:
+        """
         self.users_to_set_group.add(str(user_id))
         Debug(f'User add to set group list, uid: {user_id}', key='SET')
 
-    # Обработчик команд
     def _command_handler(self, user_id: int, text: str) -> None:
+        """
+        Обработчик команд
+
+        :param user_id:
+        :param text:
+        :return:
+        """
         match text:
             case cfg.CMD_START:
                 user_data = self.vk.users.get(user_id=user_id)[0]
@@ -57,12 +74,17 @@ class VkBot:
             self._edit_user_group(user_id, text)
             return
         self._send_message(user_id, cfg.INVALID_COMMAND_TEXT)
-        # print(self.users_to_set_group)
 
     def _edit_user_group(self, user_id: int, group_slug: str) -> None:
-        group_pattern = r'\w{4}-\d{2}-\d{2}'  # Паттерн группы
+        """
+        Изменить группу пользователя или выдать ошибку
+
+        :param user_id:
+        :param group_slug:
+        :return:
+        """
         group_slug = group_slug.upper()
-        if re.match(group_pattern, group_slug):
+        if self._validate_group_slug(group_slug):
             db = Database()
             if not db.fetch_one(table=scfg.TABLE_NAME, condition=f'user_id = {user_id}'):
                 db.insert_one(table=scfg.TABLE_NAME, data=[user_id, group_slug])
@@ -79,15 +101,44 @@ class VkBot:
         # Debug('from {} text = \'{}\''.format(event.user_id, event.text), key='MSG')
         # self._command_handler(event.user_id, event.text.lower())
 
-    # Убирает пользователя из списка ожидания
     def _clear_wait_lists(self, user_id: int) -> None:
+        """
+        Убирает пользователя из списка ожидания
+
+        :param user_id:
+        :return:
+        """
         self.users_to_set_group.discard(str(user_id))
 
-    def _send_message(self, user_id: int, text: str, keyboard: int = 0):
+    def _validate_group_slug(self, group_slug: str) -> bool:
+        """
+        Проверка на валидность номера группы по маске и списку групп
+
+        :param group_slug:
+        :return:
+        """
+        group_slug = group_slug.upper()
+        if re.match(scfg.GROUP_PATTERN, group_slug):
+            year_of_in = int('20' + group_slug[-2:])
+            now = datetime.datetime.now()
+            if now.month <= 6:
+                year_of_in += 1
+            course_number = now.year - year_of_in  # Курс - 1
+            if time.time() - 43200 > self.last_schedule_file_update:  # Если с последнего обновления > 12 часов
+                self._update_schedule_file()
+            if 0 <= course_number <= 2:
+                for i in range(0, len(self.schedule_data[course_number]), 4):
+                    if self.schedule_data[course_number][i][0] == group_slug:
+                        Debug(f'Find in file group: {group_slug} column: {i + 1}', key='FND')
+                        return True
+        return False
+
+    def _send_message(self, user_id: int, text: str, keyboard: int = 0) -> None:
         """
         Отправка сообщения
-        :param user_id:
-        :param text:
+
+        :param user_id: ID пользователя
+        :param text: Текс сообщения
         :param keyboard: 0 - Без клавиатуры(не менять), 1 - Стандартная клавиатура, 2 - Дополнительная(Настройки)
         :return:
         """
@@ -95,7 +146,9 @@ class VkBot:
             keyboard = VkKeyboard(one_time=False)
             keyboard.add_button('Начать', color=VkKeyboardColor.NEGATIVE)
             keyboard.add_line()  # переход на вторую строку
-            keyboard.add_button('Зелёная кнопка', color=VkKeyboardColor.POSITIVE)
+            keyboard.add_button('ИКБО-30-21', color=VkKeyboardColor.POSITIVE)
+            keyboard.add_button('ИКБО-10-21', color=VkKeyboardColor.POSITIVE)
+            keyboard.add_button('ИКБО-00-21', color=VkKeyboardColor.POSITIVE)
         elif keyboard == 2:
             keyboard = VkKeyboard(one_time=True)
             keyboard.add_button('321', color=VkKeyboardColor.NEGATIVE)
@@ -128,22 +181,49 @@ class VkBot:
         course_pattern = r'([1-3]) курс'
         for x in result:
             course = x.find('div', 'uk-link-heading').text.lower().strip()
-            cf = re.match(course_pattern, course)
-            if cf:
-                cf = cf.group(1)
-                f = open(f'{scfg.DATA_DIR}{scfg.SCHEDULE_BASE_NAME}{cf}.xlsx', "wb")
+            course_number = re.match(course_pattern, course)
+            if course_number:
+                course_number = course_number.group(1)
+                f = open(f'{scfg.DATA_DIR}{scfg.SCHEDULE_BASE_NAME}{course_number}.xlsx', "wb")
                 link = x.get('href')
                 resp = requests.get(link)  # запрос по ссылке
                 f.write(resp.content)  # Записываем контент в файл
+                f.close()
         self.last_schedule_file_update = time.time()
-        # match course:
-        #     case '1 курс':
-        #
-        # if  == '1 курс':
-        #     f = open("file.xlsx", "wb")
-        #     link = x.get('href')
-        #     resp = requests.get(link)  # запрос по ссылке
-        #     f.write(resp.content)
+        Debug('Update schedule files', key='UPD')
+        self._parse_schedule_file()
+
+    def _parse_schedule_file(self) -> None:
+        """
+        Парсит полученные файлы расписание и записывает в списки
+
+        :return:
+        """
+        self.schedule_data = []
+        for c in range(3):
+            data_tmp = []
+            book = openpyxl.load_workbook(
+                f'{scfg.DATA_DIR}{scfg.SCHEDULE_BASE_NAME}{c + 1}.xlsx')  # открытие файла
+            sheet = book.active  # активный лист
+            num_cols = sheet.max_column  # количество столбцов
+            num_rows = sheet.max_row  # количество строк
+            last_group_cell = 0  # Сколько прошло ячеек от последней группы
+            for i in range(6, num_cols):
+                if last_group_cell >= 4:  # Если после группы прошло 4 ячейки, ждём следующей группы
+                    last_group_cell = -1
+                    continue
+                column = []
+                for j in range(2, 75):  # Перебираем
+                    v = str(sheet.cell(column=i, row=j).value)
+                    if j == 2 and re.match(scfg.GROUP_PATTERN,
+                                           v):  # Если ячейка вторая, то проверяем что это номер группы
+                        last_group_cell = 0  # Если это так, обнуляем счётчик
+                    column.append(v)
+                if last_group_cell != -1:  # Пока не дошли до следующей группы, не добавляем столбцы,
+                    data_tmp.append(column)
+                    last_group_cell += 1
+            self.schedule_data.append(data_tmp)
+        Debug('Parse schedule file', key='PRS')
 
 
 def main():
