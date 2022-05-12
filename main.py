@@ -69,11 +69,24 @@ class VkBot:
                 Debug(f'Start new user: {user_data["first_name"]} {user_data["last_name"]}')
                 self._add_user_to_edit_group_list(user_id)
                 return
+            case cfg.CMD_SCHEDULE:
+                self._show_schedule_keyboard(user_id)
+                return
 
         if str(user_id) in self.users_to_set_group:
             self._edit_user_group(user_id, text)
             return
         self._send_message(user_id, cfg.INVALID_COMMAND_TEXT)
+
+    def _show_schedule_keyboard(self, user_id: int) -> None:
+        """
+        Показать клавиатуру выбора расписания
+
+        :param user_id:
+        :return:
+        """
+        Debug(f'Show schedule keyboard for id: {user_id}')
+        self._send_message(user_id, cfg.SCHEDULE_SELECT_TEXT, keyboard=1)
 
     def _edit_user_group(self, user_id: int, group_slug: str) -> None:
         """
@@ -95,9 +108,11 @@ class VkBot:
                 Debug(f'ReSet user group: {group_slug} uid: {user_id}', key='RST')
             self._send_message(user_id, cfg.SET_GROUP_TEXT.format(group_slug), 1)
             self._clear_wait_lists(user_id)  # Убираем из списка ожидания
+            self._show_schedule_keyboard(user_id=user_id)  # Показываем клавиатуры выбора
         else:
             self._send_message(user_id, cfg.INVALID_GROUP_TEXT)
             Debug(f'Invalid group format {group_slug} uid: {user_id}', key='INV')
+
         # Debug('from {} text = \'{}\''.format(event.user_id, event.text), key='MSG')
         # self._command_handler(event.user_id, event.text.lower())
 
@@ -144,13 +159,23 @@ class VkBot:
         """
         if keyboard == 1:
             keyboard = VkKeyboard(one_time=False)
-            keyboard.add_button('Начать', color=VkKeyboardColor.NEGATIVE)
-            keyboard.add_line()  # переход на вторую строку
-            keyboard.add_button('ИКБО-30-21', color=VkKeyboardColor.POSITIVE)
-            keyboard.add_button('ИКБО-10-21', color=VkKeyboardColor.POSITIVE)
-            keyboard.add_button('ИКБО-00-21', color=VkKeyboardColor.POSITIVE)
+            keyboard.add_button(cfg.BTN_SCHEDULE_TODAY, color=VkKeyboardColor.POSITIVE)
+            keyboard.add_button(cfg.BTN_SCHEDULE_TOMORROW, color=VkKeyboardColor.NEGATIVE)
+            keyboard.add_line()
+            keyboard.add_button(cfg.BTN_SCHEDULE_WEEK, color=VkKeyboardColor.PRIMARY)
+            keyboard.add_button(cfg.BTN_SCHEDULE_NEXT_WEEK, color=VkKeyboardColor.PRIMARY)
+            keyboard.add_line()
+            keyboard.add_button(cfg.BTN_WHAT_WEEK, color=VkKeyboardColor.SECONDARY)
+            keyboard.add_button(cfg.BTN_WHAT_GROUP, color=VkKeyboardColor.SECONDARY)
+            keyboard.add_button(cfg.BTN_SETTINGS, color=VkKeyboardColor.SECONDARY)
+
+            # keyboard.add_button('Начать', color=VkKeyboardColor.NEGATIVE)
+            # keyboard = VkKeyboard(one_time=True)
+            #   # переход на вторую строку
+            # keyboard.add_button('ИКБО-30-21', color=VkKeyboardColor.POSITIVE)
+            # keyboard.add_button('ИКБО-10-21', color=VkKeyboardColor.POSITIVE)
+            # keyboard.add_button('ИКБО-00-21', color=VkKeyboardColor.POSITIVE)
         elif keyboard == 2:
-            keyboard = VkKeyboard(one_time=True)
             keyboard.add_button('321', color=VkKeyboardColor.NEGATIVE)
             keyboard.add_line()  # переход на вторую строку
             keyboard.add_button('Зелёная кнопка', color=VkKeyboardColor.POSITIVE)
