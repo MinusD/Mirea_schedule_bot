@@ -24,7 +24,6 @@ class Database:
 
     def update_one(self, table: str = '', sets: str = '', condition: str = '') -> None:
         req = 'UPDATE {} SET {} WHERE {}'.format(table, sets, condition)
-        print(req)
         self.cursor.execute(req)
         self.conn.commit()
 
