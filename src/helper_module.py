@@ -18,3 +18,4 @@ class Debug:
             with open(cfg.DATA_DIR + cfg.LOG_FILENAME, 'a') as f:
                 f.write(f'{key} --- {str(datetime.datetime.now())} --- {data}\n')
                 # f.write(f'{key} --- {str(datetime.datetime.now())[:-7]} --- {comment}\n')
+

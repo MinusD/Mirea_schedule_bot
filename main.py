@@ -72,11 +72,61 @@ class VkBot:
             case cfg.CMD_SCHEDULE:
                 self._show_schedule_keyboard(user_id)
                 return
+            case cfg.BTN_SCHEDULE_TODAY:
+
+                return
+            case cfg.BTN_WHAT_WEEK:
+                self._show_current_week(user_id)
+            case cfg.BTN_WHAT_GROUP:
+                self._show_user_group(user_id)
+                return
 
         if str(user_id) in self.users_to_set_group:
             self._edit_user_group(user_id, text)
             return
-        self._send_message(user_id, cfg.INVALID_COMMAND_TEXT)
+        self._send_message(user_id, cfg.INVALID_COMMAND_TEXT.format(cfg.BTN_HELP))
+
+    def _get_user_group(self, user_id: int) -> str or None:
+        """
+        Получает группу пользователя или ошибка
+
+        :param user_id:
+        :return: Номер группы или None
+        """
+        group = Database().fetch_one(table=scfg.TABLE_NAME, condition=f'user_id = {user_id}')
+        if group:
+            return group[1]
+        return None
+
+    def _get_current_week(self) -> int:
+        """
+        Возвращает номер текущей недели
+
+        :return: учебная неделя
+        """
+        return datetime.datetime.now().isocalendar().week + scfg.WEEK_DELTA
+
+    def _show_current_week(self, user_id: int) -> None:
+        """
+        Выводит пользователю номер текущей недели
+
+        :param user_id:
+        :return:
+        """
+        self._send_message(user_id, cfg.CURRENT_WEEK_TEXT.format(self._get_current_week()))
+
+    def _show_user_group(self, user_id: int) -> None:
+        """
+        Выводит пользователю номер выбранной группы или ошибку
+
+        :param user_id:
+        :return:
+        """
+        group = self._get_user_group(user_id)
+        if group:
+            self._send_message(user_id, cfg.CURRENT_GROUP_TEXT.format(group))
+        else:
+            self._send_message(user_id, cfg.CURRENT_GROUP_ERROR_TEXT.format(cfg.CMD_SCHEDULE.title()))
 
     def _show_schedule_keyboard(self, user_id: int) -> None:
         """
@@ -109,6 +159,7 @@ class VkBot:
             self._send_message(user_id, cfg.SET_GROUP_TEXT.format(group_slug), 1)
             self._clear_wait_lists(user_id)  # Убираем из списка ожидания
             self._show_schedule_keyboard(user_id=user_id)  # Показываем клавиатуры выбора
+            del db
         else:
             self._send_message(user_id, cfg.INVALID_GROUP_TEXT)
             Debug(f'Invalid group format {group_slug} uid: {user_id}', key='INV')
@@ -165,9 +216,10 @@ class VkBot:
             keyboard.add_button(cfg.BTN_SCHEDULE_WEEK, color=VkKeyboardColor.PRIMARY)
             keyboard.add_button(cfg.BTN_SCHEDULE_NEXT_WEEK, color=VkKeyboardColor.PRIMARY)
             keyboard.add_line()
-            keyboard.add_button(cfg.BTN_WHAT_WEEK, color=VkKeyboardColor.SECONDARY)
-            keyboard.add_button(cfg.BTN_WHAT_GROUP, color=VkKeyboardColor.SECONDARY)
-            keyboard.add_button(cfg.BTN_SETTINGS, color=VkKeyboardColor.SECONDARY)
+            keyboard.add_button(cfg.BTN_WHAT_WEEK.title(), color=VkKeyboardColor.SECONDARY)
+            keyboard.add_button(cfg.BTN_WHAT_GROUP.title(), color=VkKeyboardColor.SECONDARY)
+            keyboard.add_button(cfg.BTN_HELP.title(), color=VkKeyboardColor.SECONDARY)
+            keyboard.add_button(cfg.BTN_SETTINGS.title(), color=VkKeyboardColor.SECONDARY)
 
             # keyboard.add_button('Начать', color=VkKeyboardColor.NEGATIVE)
             # keyboard = VkKeyboard(one_time=True)
@@ -176,6 +228,7 @@ class VkBot:
             # keyboard.add_button('ИКБО-10-21', color=VkKeyboardColor.POSITIVE)
             # keyboard.add_button('ИКБО-00-21', color=VkKeyboardColor.POSITIVE)
         elif keyboard == 2:
+            keyboard = VkKeyboard(one_time=True)
             keyboard.add_button('321', color=VkKeyboardColor.NEGATIVE)
             keyboard.add_line()  # переход на вторую строку
             keyboard.add_button('Зелёная кнопка', color=VkKeyboardColor.POSITIVE)
