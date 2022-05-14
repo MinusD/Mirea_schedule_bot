@@ -44,16 +44,6 @@ class VkBot:
                 Debug('from {} text = \'{}\''.format(event.user_id, event.text), key='MSG')
                 self._command_handler(event.user_id, event.text.lower())
 
-    def _add_user_to_edit_group_list(self, user_id) -> None:
-        """
-        Добавляет пользователя в список обновления группы
-
-        :param user_id:
-        :return:
-        """
-        self.users_to_set_group.add(str(user_id))
-        Debug(f'User add to set group list, uid: {user_id}', key='SET')
-
     def _command_handler(self, user_id: int, text: str) -> None:
         """
         Обработчик команд
@@ -77,6 +67,7 @@ class VkBot:
                 return
             case cfg.BTN_WHAT_WEEK:
                 self._show_current_week(user_id)
+                return
             case cfg.BTN_WHAT_GROUP:
                 self._show_user_group(user_id)
                 return
@@ -85,6 +76,12 @@ class VkBot:
             self._edit_user_group(user_id, text)
             return
         self._send_message(user_id, cfg.INVALID_COMMAND_TEXT.format(cfg.BTN_HELP))
+
+    def _get_day_schedule(self, group: str, date: datetime.datetime) -> list:
+        Debug(f'Getting schedule  by group: {group} to date: {date}')
+        column = self._get_group_column(group)
+
+        pass
 
     def _get_user_group(self, user_id: int) -> str or None:
         """
@@ -96,6 +93,8 @@ class VkBot:
         group = Database().fetch_one(table=scfg.TABLE_NAME, condition=f'user_id = {user_id}')
         if group:
             return group[1]
+        else:
+            self._send_message(user_id, cfg.CURRENT_GROUP_ERROR_TEXT.format(cfg.CMD_SCHEDULE.title()))
         return None
 
     def _get_current_week(self) -> int:
@@ -105,6 +104,35 @@ class VkBot:
         :return: учебная неделя
         """
         return datetime.datetime.now().isocalendar().week + scfg.WEEK_DELTA
+
+    def _get_group_column(self, group) -> int or None:
+        """
+        Ищет столбец группы в расписании
+
+        :param group:
+        :return: Индекс столбца или None
+        """
+        year_of_in = int('20' + group_slug[-2:])
+        now = datetime.datetime.now()
+        if now.month <= 6:
+            year_of_in += 1
+        course_number = now.year - year_of_in  # Курс - 1
+        if time.time() - 43200 > self.last_schedule_file_update:  # Если с последнего обновления > 12 часов
+            self._update_schedule_file()
+        if 0 <= course_number <= 2:
+            for i in range(0, len(self.schedule_data[course_number]), 4):
+                if self.schedule_data[course_number][i][0] == group_slug:
+                    Debug(f'Find in file group: {group_slug} column: {i + 1}', key='FND')
+                    return i
+        return None
+
+    def _show_today_schedule(self, user_id: int) -> None:
+        # now = datetime.datetime.now()
+        group = self._get_user_group(user_id)
+        if group:
+            schedule = self._get_day_schedule(group, datetime.datetime.now())
+
+        pass
 
     def _show_current_week(self, user_id: int) -> None:
         """
@@ -125,8 +153,6 @@ class VkBot:
         group = self._get_user_group(user_id)
         if group:
             self._send_message(user_id, cfg.CURRENT_GROUP_TEXT.format(group))
-        else:
-            self._send_message(user_id, cfg.CURRENT_GROUP_ERROR_TEXT.format(cfg.CMD_SCHEDULE.title()))
 
     def _show_schedule_keyboard(self, user_id: int) -> None:
         """
@@ -137,6 +163,16 @@ class VkBot:
         """
         Debug(f'Show schedule keyboard for id: {user_id}')
         self._send_message(user_id, cfg.SCHEDULE_SELECT_TEXT, keyboard=1)
+
+    def _add_user_to_edit_group_list(self, user_id) -> None:
+        """
+        Добавляет пользователя в список обновления группы
+
+        :param user_id:
+        :return:
+        """
+        self.users_to_set_group.add(str(user_id))
+        Debug(f'User add to set group list, uid: {user_id}', key='SET')
 
     def _edit_user_group(self, user_id: int, group_slug: str) -> None:
         """
@@ -185,18 +221,8 @@ class VkBot:
         """
         group_slug = group_slug.upper()
         if re.match(scfg.GROUP_PATTERN, group_slug):
-            year_of_in = int('20' + group_slug[-2:])
-            now = datetime.datetime.now()
-            if now.month <= 6:
-                year_of_in += 1
-            course_number = now.year - year_of_in  # Курс - 1
-            if time.time() - 43200 > self.last_schedule_file_update:  # Если с последнего обновления > 12 часов
-                self._update_schedule_file()
-            if 0 <= course_number <= 2:
-                for i in range(0, len(self.schedule_data[course_number]), 4):
-                    if self.schedule_data[course_number][i][0] == group_slug:
-                        Debug(f'Find in file group: {group_slug} column: {i + 1}', key='FND')
-                        return True
+            if self._get_group_column(group_slug):
+                return True
         return False
 
     def _send_message(self, user_id: int, text: str, keyboard: int = 0) -> None:
