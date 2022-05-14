@@ -1,3 +1,5 @@
+import datetime
+
 import requests
 import openpyxl
 import pickle
@@ -6,7 +8,49 @@ from bs4 import BeautifulSoup
 import src.cfgs.system_config as scfg
 
 if __name__ == '__main__':
-    group_slug = "ИКБО-30-21"
+    now = datetime.datetime.now()
+    print(now.isocalendar())
+
+    # a = [i for i in range(10)]
+    # for i in range(len(a)):
+    #     if i % 2 == 0:
+    #         del a[i]
+    # for i in range(len(a)):
+    #     print(a[i])
+    # s = '123\n321'
+    # a = '123'
+    # d = s.split('\n')
+    # d.append('213')
+    # print(' - '.join(d))
+    # print(' - '.join(a.split('\n')))
+
+    # data = ['Структуры и алгоритмы обработки данных',
+    #         '4,8,12,16 н. Физика (1 п/г)\n4,8,12,16 н. Физика (2 п/г)',
+    #         'кр. 12 н. Объектно-ориентированное программирование',
+    #         'кр. 1,3 н. Ознакомительная практика']
+    #
+    # custom_week_pattern_1 = r'([\d\,]+) н. ([^\\]+)'
+    # custom_week_pattern = r'кр. ([\d\,]+) н. ([^\\]+)'
+    #
+    # for a in data:
+    #     s = re.search(custom_week_pattern, a)
+    #     if s:
+    #         d = s.group(1).split(',')
+    #         print(d)
+    #         print(s.group(2))
+    #     else:
+    #         s = re.search(custom_week_pattern_1, a)
+    #         if s:
+    #             d = s.group(1).split(',')
+    #             print('есть', d)
+    #             print(s.group(2))
+
+    # print(re.search(custom_week_pattern, text1))
+    # print(re.search(custom_week_pattern, text2))
+    # print(re.search(custom_week_pattern, text3))
+    # print(re.search(custom_week_pattern, text4))
+
+    # group_slug = "ИКБО-30-21"
     # book = openpyxl.load_workbook(
     #     f'../{scfg.DATA_DIR}{scfg.SCHEDULE_BASE_NAME}{1}.xlsx')  # открытие файла
     # sheet = book.active  # активный лист
@@ -35,7 +79,6 @@ if __name__ == '__main__':
     #     pickle.dump(data, f, fix_imports=True)
     # del data
 
-
     # print('dd')
     #
     # a = int(input())
@@ -43,6 +86,7 @@ if __name__ == '__main__':
     #
     # if sheet.cell(row=2, column=(i + 1)).value == group_slug:
     #     print(i + 1)
+    pass
 
 # page = requests.get("https://www.mirea.ru/schedule/")
 #

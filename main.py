@@ -28,7 +28,10 @@ class VkBot:
         self.users_to_set_group: set = set()
         self.last_schedule_file_update: time
         self.schedule_data: list
-        self._update_schedule_file()
+        if scfg.UPDATE_SCHEDULE_FILE_ON_START:
+            self._update_schedule_file()
+        else:
+            self._parse_schedule_file()
 
         Debug('Bot init', key='SRT')
 
@@ -63,7 +66,10 @@ class VkBot:
                 self._show_schedule_keyboard(user_id)
                 return
             case cfg.BTN_SCHEDULE_TODAY:
-
+                self._show_today_schedule(user_id)
+                return
+            case cfg.BTN_SCHEDULE_TOMORROW:
+                self._show_tomorrow_schedule(user_id)
                 return
             case cfg.BTN_WHAT_WEEK:
                 self._show_current_week(user_id)
@@ -77,11 +83,44 @@ class VkBot:
             return
         self._send_message(user_id, cfg.INVALID_COMMAND_TEXT.format(cfg.BTN_HELP))
 
-    def _get_day_schedule(self, group: str, date: datetime.datetime) -> list:
-        Debug(f'Getting schedule  by group: {group} to date: {date}')
+    def _get_week_schedule(self, group: str, date: datetime.datetime) -> list:
+        now = date.isocalendar()
+        week = now.week + scfg.WEEK_DELTA
+        week_even = (week + 1) % 2  # Является ли неделя чётной
         column = self._get_group_column(group)
+        out = []
+        tmp = []
+        for i in range(2 + week_even, len(self.schedule_data[column]), 2):  # Каждый второй, со смещением по недели
+            tmp.append(
+                [self.schedule_data[column][i],  # Предмет
+                 self.schedule_data[column + 1][i],  # Вид занятий
+                 self.schedule_data[column + 2][i],  # Преподаватель
+                 self.schedule_data[column + 3][i]]  # Кабинет
+            )
+            if len(tmp) == 6:
+                out.append(tmp)
+                tmp = []
+        for i in range(len(out)):
+            for j in range(6):
+                out[i][j][0] = self._reformat_subject_name(out[i][j][0], week_number=week)
+                out[i][j][1] = self._reformat_double_pair(out[i][j][1])
+                out[i][j][2] = self._reformat_double_pair(out[i][j][2])
+                out[i][j][3] = self._reformat_double_pair(out[i][j][3])
+        return out
 
-        pass
+    def _get_day_schedule(self, group: str, date: datetime.datetime) -> list:
+        """
+        Возвращает массив с расписанием на текущий день
+
+        :param group: Номер группы
+        :param date: День
+        :return:
+        """
+        week = self._get_week_schedule(group, date)
+        week_index = date.isocalendar().weekday - 1
+        if week_index == 6:
+            return [[] * 4] * 6
+        return week[week_index]
 
     def _get_user_group(self, user_id: int) -> str or None:
         """
@@ -112,27 +151,44 @@ class VkBot:
         :param group:
         :return: Индекс столбца или None
         """
-        year_of_in = int('20' + group_slug[-2:])
-        now = datetime.datetime.now()
-        if now.month <= 6:
-            year_of_in += 1
-        course_number = now.year - year_of_in  # Курс - 1
-        if time.time() - 43200 > self.last_schedule_file_update:  # Если с последнего обновления > 12 часов
-            self._update_schedule_file()
-        if 0 <= course_number <= 2:
-            for i in range(0, len(self.schedule_data[course_number]), 4):
-                if self.schedule_data[course_number][i][0] == group_slug:
-                    Debug(f'Find in file group: {group_slug} column: {i + 1}', key='FND')
-                    return i
+        for i in range(0, len(self.schedule_data), 4):
+            if self.schedule_data[i][0] == group:
+                Debug(f'Find in file group: {group} column: {i + 1}', key='FND')
+                return i
         return None
 
+    def _get_string_date(self, date: datetime.datetime, with_week_day: bool = False) -> str:
+        result = ''
+        if with_week_day:
+            result += '...'
+        result += str(date.day) + " " + cfg.MONTHS_SLUGS[date.month % 12 - 1]
+        return result
+
     def _show_today_schedule(self, user_id: int) -> None:
-        # now = datetime.datetime.now()
+        """
+        Выводит расписание на сегодняшний день
+
+        :param user_id:
+        :return:
+        """
+        now = datetime.datetime.now()
         group = self._get_user_group(user_id)
         if group:
-            schedule = self._get_day_schedule(group, datetime.datetime.now())
+            schedule = self._get_day_schedule(group, now)
+            self._send_message(user_id=user_id, text=self._reformat_day_schedule(schedule, now))
 
-        pass
+    def _show_tomorrow_schedule(self, user_id: int) -> None:
+        """
+        Выводит расписание на завтрашний день
+
+        :param user_id:
+        :return:
+        """
+        now = datetime.datetime.now() + datetime.timedelta(days=1)
+        group = self._get_user_group(user_id)
+        if group:
+            schedule = self._get_day_schedule(group, now)
+            self._send_message(user_id=user_id, text=self._reformat_day_schedule(schedule, now))
 
     def _show_current_week(self, user_id: int) -> None:
         """
@@ -225,6 +281,61 @@ class VkBot:
                 return True
         return False
 
+    def _reformat_subject_name(self, name: str or None, week_number: int) -> str or None:
+        custom_week_pattern = r'кр. ([\d\,]+) н. ([^\\]+)'  # Кроме каких-то недель
+        custom_week_is_set_pattern = r'([\d\,]+) н. ([^\\]+)'  # Включая эти недели
+        custom_week_dirt_pattern = r'…'  # Заглушки в расписании
+        # print(name, type(name), len(name))
+        if name and name != 'None':  # Пара есть?
+            data = name.split('\n')
+            for i in range(len(data)):
+                kr = re.search(custom_week_pattern, data[i])  # Проверяем, есть ли паттерн КР
+                if kr:
+                    if str(week_number) in kr.group(1).split(','):  # Если неделя в списке исключённых удаляем
+                        data[i] = cfg.WINDOW_SIGNATURE
+                    else:
+                        data[i] = kr.group(2)
+                else:
+                    is_set = re.search(custom_week_is_set_pattern, data[i])
+                    if is_set:
+                        if str(week_number) in is_set.group(1).split(','):
+                            data[i] = is_set.group(2)
+                        else:
+                            data[i] = cfg.WINDOW_SIGNATURE
+                    else:
+                        dirt = re.search(custom_week_dirt_pattern, data[i])
+                        if dirt:
+                            data[i] = cfg.WINDOW_SIGNATURE
+            return cfg.SPLIT_PAIR_SEPARATOR.join(data) if data else cfg.WINDOW_SIGNATURE
+        return cfg.WINDOW_SIGNATURE
+
+    def _reformat_double_pair(self, data: any) -> str:
+        if data:
+            if data == 'None':
+                return ''
+            return cfg.SPLIT_PAIR_SEPARATOR.join(data.split('\n'))
+        return cfg.WINDOW_SIGNATURE
+
+    def _reformat_day_schedule(self, data: list, date: datetime.datetime) -> str:
+        result = cfg.ONE_DAY_HEADER_PATTERN.format(self._get_string_date(date))
+        for i in range(len(data)):
+            if len(data[i]) > 1:
+                if data[i][0] != cfg.WINDOW_SIGNATURE:
+                    result += cfg.ONE_PAIR_PATTERN.format(
+                        i + 1,
+                        str(data[i][0]),
+                        str(data[i][1]) if data[i][1] != cfg.WINDOW_SIGNATURE and data[i][
+                            1] != '' else cfg.VOID_SIGNATURE,
+                        str(data[i][2]) if data[i][2] != cfg.WINDOW_SIGNATURE and data[i][
+                            2] != '' else cfg.VOID_SIGNATURE,
+                        str(data[i][3])) if data[i][3] != cfg.WINDOW_SIGNATURE and data[i][
+                        3] != '' else cfg.VOID_SIGNATURE
+                else:
+                    result += cfg.ONE_PAIR_SHORT_PATTERN.format(i + 1, cfg.WINDOW_SIGNATURE)
+            else:
+                result += cfg.ONE_PAIR_SHORT_PATTERN.format(i + 1, cfg.WINDOW_SIGNATURE)
+        return result
+
     def _send_message(self, user_id: int, text: str, keyboard: int = 0) -> None:
         """
         Отправка сообщения
@@ -305,28 +416,26 @@ class VkBot:
         """
         self.schedule_data = []
         for c in range(3):
-            data_tmp = []
             book = openpyxl.load_workbook(
                 f'{scfg.DATA_DIR}{scfg.SCHEDULE_BASE_NAME}{c + 1}.xlsx')  # открытие файла
             sheet = book.active  # активный лист
             num_cols = sheet.max_column  # количество столбцов
-            num_rows = sheet.max_row  # количество строк
+            # num_rows = sheet.max_row  # количество строк
             last_group_cell = 0  # Сколько прошло ячеек от последней группы
             for i in range(6, num_cols):
                 if last_group_cell >= 4:  # Если после группы прошло 4 ячейки, ждём следующей группы
                     last_group_cell = -1
                     continue
                 column = []
-                for j in range(2, 75):  # Перебираем
+                for j in range(2, 76):  # Перебираем
                     v = str(sheet.cell(column=i, row=j).value)
                     if j == 2 and re.match(scfg.GROUP_PATTERN,
                                            v):  # Если ячейка вторая, то проверяем что это номер группы
                         last_group_cell = 0  # Если это так, обнуляем счётчик
                     column.append(v)
                 if last_group_cell != -1:  # Пока не дошли до следующей группы, не добавляем столбцы,
-                    data_tmp.append(column)
+                    self.schedule_data.append(column)
                     last_group_cell += 1
-            self.schedule_data.append(data_tmp)
         Debug('Parse schedule file', key='PRS')
 
 
