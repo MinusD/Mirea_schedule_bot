@@ -84,17 +84,28 @@ class VkBot:
                 self._show_user_group(user_id)
                 return
 
+        combo_cmd = text.split(' ')
+        match combo_cmd[0]:
+            case cfg.CMD_SCHEDULE:
+                if len(combo_cmd) == 2:
+                    if combo_cmd[1].lower() in cfg.WEEK_DAYS_INFINITIVE_SLUGS:
+                        self._show_week_day_schedule(user_id, combo_cmd[1].lower())
+                    else:
+                        self._edit_user_group(user_id, combo_cmd[1])
+                    return
+
         if str(user_id) in self.users_to_set_group:
             self._edit_user_group(user_id, text)
             return
         self._send_message(user_id, cfg.INVALID_COMMAND_TEXT.format(cfg.BTN_HELP))
 
-    def _get_week_schedule(self, group: str, date: datetime.datetime) -> list:
+    def _get_week_schedule(self, group: str, date: datetime.datetime, with_reformat: bool = True) -> list:
         """
         Возвращает расписанию на неделю, дату которой передали
 
         :param group:
         :param date:
+        :param with_reformat:
         :return:
         """
         now = date.isocalendar()
@@ -115,7 +126,8 @@ class VkBot:
                 tmp = []
         for i in range(len(out)):
             for j in range(6):
-                out[i][j][0] = self._reformat_subject_name(out[i][j][0], week_number=week)
+                out[i][j][0] = self._reformat_subject_name(out[i][j][0], week_number=week,
+                                                           ignore_weeks=(not with_reformat))
                 out[i][j][1] = self._reformat_double_pair(out[i][j][1])
                 out[i][j][2] = self._reformat_double_pair(out[i][j][2])
                 out[i][j][3] = self._reformat_double_pair(out[i][j][3])
@@ -183,6 +195,21 @@ class VkBot:
             result += cfg.WEEK_DAYS_SLUGS[date.isocalendar().weekday - 1] + " "
         result += str(date.day) + " " + cfg.MONTHS_SLUGS[date.month % 12 - 1]
         return result
+
+    def _show_week_day_schedule(self, user_id: int, day: str) -> None:
+        group = self._get_user_group(user_id)
+        if group:
+            date = datetime.datetime.now()
+            if self._get_current_week() % 2 == 0:  # Если она не чётная
+                date -= datetime.timedelta(weeks=1)
+            odd = self._get_week_schedule(group=group, date=date, with_reformat=False)
+            date += datetime.timedelta(weeks=1)
+            even = self._get_week_schedule(group=group, date=date, with_reformat=False)
+            index = cfg.WEEK_DAYS_INFINITIVE_SLUGS.index(day)
+            o = self._reformat_day_schedule(data=odd[index], with_header=False)  # Нечётный день
+            e = self._reformat_day_schedule(data=even[index], with_header=False)  # Чётный день
+            result = cfg.ODD_DAY_PATTERN.format(day.title()) + o + '\n\n' + cfg.EVEN_DAY_PATTERN.format(day.title()) + e
+            self._send_message(user_id, result)
 
     def _show_today_schedule(self, user_id: int) -> None:
         """
@@ -319,7 +346,7 @@ class VkBot:
                 return True
         return False
 
-    def _reformat_subject_name(self, name: str or None, week_number: int) -> str or None:
+    def _reformat_subject_name(self, name: str or None, week_number: int, ignore_weeks: bool = False) -> str or None:
         """
         Реформат названия предмета с проверкой его присутствия на определённой неделе
 
@@ -335,33 +362,34 @@ class VkBot:
         if name and name != 'None':  # Пара есть?
             data = name.split('\n')
             for i in range(len(data)):
-                kr = re.search(custom_week_pattern, data[i])  # Проверяем, есть ли паттерн КР
-                if kr:
-                    if str(week_number) in kr.group(1).split(','):  # Если неделя в списке исключённых удаляем
-                        data[i] = cfg.WINDOW_SIGNATURE
-                    else:
-                        data[i] = kr.group(2)
-                else:
-                    range_week = re.search(custom_week_range_pattern, data[i])
-                    if range_week:
-                        tmp = range_week.group(1).split('-')
-                        from_week = int(tmp[0])
-                        to_week = int(tmp[1])
-                        if from_week <= week_number <= to_week:
-                            data[i] = range_week.group(2)
-                        else:
+                if not ignore_weeks:
+                    kr = re.search(custom_week_pattern, data[i])  # Проверяем, есть ли паттерн КР
+                    if kr:
+                        if str(week_number) in kr.group(1).split(','):  # Если неделя в списке исключённых удаляем
                             data[i] = cfg.WINDOW_SIGNATURE
+                        else:
+                            data[i] = kr.group(2)
                     else:
-                        is_set = re.search(custom_week_is_set_pattern, data[i])
-                        if is_set:
-                            if str(week_number) in is_set.group(1).split(','):
-                                data[i] = is_set.group(2)
+                        range_week = re.search(custom_week_range_pattern, data[i])
+                        if range_week:
+                            tmp = range_week.group(1).split('-')
+                            from_week = int(tmp[0])
+                            to_week = int(tmp[1])
+                            if from_week <= week_number <= to_week:
+                                data[i] = range_week.group(2)
                             else:
                                 data[i] = cfg.WINDOW_SIGNATURE
                         else:
-                            dirt = re.search(custom_week_dirt_pattern, data[i])
-                            if dirt:
-                                data[i] = cfg.WINDOW_SIGNATURE
+                            is_set = re.search(custom_week_is_set_pattern, data[i])
+                            if is_set:
+                                if str(week_number) in is_set.group(1).split(','):
+                                    data[i] = is_set.group(2)
+                                else:
+                                    data[i] = cfg.WINDOW_SIGNATURE
+                            else:
+                                dirt = re.search(custom_week_dirt_pattern, data[i])
+                                if dirt:
+                                    data[i] = cfg.WINDOW_SIGNATURE
             return cfg.SPLIT_PAIR_SEPARATOR.join(data) if data else cfg.WINDOW_SIGNATURE
         return cfg.WINDOW_SIGNATURE
 
@@ -378,7 +406,8 @@ class VkBot:
             return cfg.SPLIT_PAIR_SEPARATOR.join(data.split('\n'))
         return cfg.WINDOW_SIGNATURE
 
-    def _reformat_day_schedule(self, data: list, date: datetime.datetime, week_format: bool = False) -> str:
+    def _reformat_day_schedule(self, data: list, date: datetime.datetime = datetime.datetime.now(),
+                               week_format: bool = False, with_header: bool = True) -> str:
         """
         Форматирует один день из списка в строку для дальнейшего вывода
 
@@ -386,7 +415,10 @@ class VkBot:
         :param date:
         :return:
         """
-        result = cfg.ONE_DAY_HEADER_PATTERN.format(self._get_string_date(date, with_week_day=week_format))  # Дата
+
+        result = ''
+        if with_header:
+            result += cfg.ONE_DAY_HEADER_PATTERN.format(self._get_string_date(date, with_week_day=week_format))  # Дата
         for i in range(len(data)):
             if len(data[i]) > 1:
                 if data[i][0][:len(cfg.WINDOW_SIGNATURE)] != cfg.WINDOW_SIGNATURE:
