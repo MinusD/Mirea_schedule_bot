@@ -84,6 +84,13 @@ class VkBot:
         self._send_message(user_id, cfg.INVALID_COMMAND_TEXT.format(cfg.BTN_HELP))
 
     def _get_week_schedule(self, group: str, date: datetime.datetime) -> list:
+        """
+        Возвращает расписанию на неделю, дату которой передали
+
+        :param group:
+        :param date:
+        :return:
+        """
         now = date.isocalendar()
         week = now.week + scfg.WEEK_DELTA
         week_even = (week + 1) % 2  # Является ли неделя чётной
@@ -158,6 +165,13 @@ class VkBot:
         return None
 
     def _get_string_date(self, date: datetime.datetime, with_week_day: bool = False) -> str:
+        """
+        Преобразует дату в строку с датой
+
+        :param date:
+        :param with_week_day:
+        :return:
+        """
         result = ''
         if with_week_day:
             result += '...'
@@ -282,6 +296,13 @@ class VkBot:
         return False
 
     def _reformat_subject_name(self, name: str or None, week_number: int) -> str or None:
+        """
+        Реформат названия предмета с проверкой его присутствия на определённой неделе
+
+        :param name:
+        :param week_number:
+        :return:
+        """
         custom_week_pattern = r'кр. ([\d\,]+) н. ([^\\]+)'  # Кроме каких-то недель
         custom_week_is_set_pattern = r'([\d\,]+) н. ([^\\]+)'  # Включая эти недели
         custom_week_dirt_pattern = r'…'  # Заглушки в расписании
@@ -310,14 +331,27 @@ class VkBot:
         return cfg.WINDOW_SIGNATURE
 
     def _reformat_double_pair(self, data: any) -> str:
+        """
+        Двойные и пустые пары в читабельный формат
+
+        :param data:
+        :return:
+        """
         if data:
             if data == 'None':
                 return ''
             return cfg.SPLIT_PAIR_SEPARATOR.join(data.split('\n'))
         return cfg.WINDOW_SIGNATURE
 
-    def _reformat_day_schedule(self, data: list, date: datetime.datetime) -> str:
-        result = cfg.ONE_DAY_HEADER_PATTERN.format(self._get_string_date(date))
+    def _reformat_day_schedule(self, data: list, date: datetime.datetime, week_format: bool = False) -> str:
+        """
+        Форматирует один день из списка в строку для дальнейшего вывода
+
+        :param data:
+        :param date:
+        :return:
+        """
+        result = cfg.ONE_DAY_HEADER_PATTERN.format(self._get_string_date(date, with_week_day=week_format))
         for i in range(len(data)):
             if len(data[i]) > 1:
                 if data[i][0] != cfg.WINDOW_SIGNATURE:
