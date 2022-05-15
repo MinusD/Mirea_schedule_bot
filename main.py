@@ -71,6 +71,12 @@ class VkBot:
             case cfg.BTN_SCHEDULE_TOMORROW:
                 self._show_tomorrow_schedule(user_id)
                 return
+            case cfg.BTN_SCHEDULE_WEEK:
+                self._show_week_schedule(user_id)
+                return
+            case cfg.BTN_SCHEDULE_NEXT_WEEK:
+                self._show_week_schedule(user_id, week_delta=1)
+                return
             case cfg.BTN_WHAT_WEEK:
                 self._show_current_week(user_id)
                 return
@@ -174,7 +180,7 @@ class VkBot:
         """
         result = ''
         if with_week_day:
-            result += '...'
+            result += cfg.WEEK_DAYS_SLUGS[date.isocalendar().weekday - 1] + " "
         result += str(date.day) + " " + cfg.MONTHS_SLUGS[date.month % 12 - 1]
         return result
 
@@ -203,6 +209,24 @@ class VkBot:
         if group:
             schedule = self._get_day_schedule(group, now)
             self._send_message(user_id=user_id, text=self._reformat_day_schedule(schedule, now))
+
+    def _show_week_schedule(self, user_id: int, week_delta: int = 0) -> None:
+        """
+        Выводит расписание на текущую неделю
+
+        :param user_id:
+        :return:
+        """
+        now = datetime.datetime.now() + datetime.timedelta(weeks=week_delta)
+        day_date = now - datetime.timedelta(days=now.isocalendar().weekday - 1)
+        group = self._get_user_group(user_id)
+        result = ''
+        if group:
+            schedule = self._get_week_schedule(group, now)
+            for i in range(6):
+                result += self._reformat_day_schedule(schedule[i], date=day_date, week_format=True)
+                day_date += datetime.timedelta(days=1)
+            self._send_message(user_id, result)
 
     def _show_current_week(self, user_id: int) -> None:
         """
@@ -351,19 +375,20 @@ class VkBot:
         :param date:
         :return:
         """
-        result = cfg.ONE_DAY_HEADER_PATTERN.format(self._get_string_date(date, with_week_day=week_format))
+        result = cfg.ONE_DAY_HEADER_PATTERN.format(self._get_string_date(date, with_week_day=week_format))  # Дата
         for i in range(len(data)):
             if len(data[i]) > 1:
-                if data[i][0] != cfg.WINDOW_SIGNATURE:
+                if data[i][0][:len(cfg.WINDOW_SIGNATURE)] != cfg.WINDOW_SIGNATURE:
                     result += cfg.ONE_PAIR_PATTERN.format(
                         i + 1,
                         str(data[i][0]),
-                        str(data[i][1]) if data[i][1] != cfg.WINDOW_SIGNATURE and data[i][
-                            1] != '' else cfg.VOID_SIGNATURE,
-                        str(data[i][2]) if data[i][2] != cfg.WINDOW_SIGNATURE and data[i][
-                            2] != '' else cfg.VOID_SIGNATURE,
-                        str(data[i][3])) if data[i][3] != cfg.WINDOW_SIGNATURE and data[i][
-                        3] != '' else cfg.VOID_SIGNATURE
+                        str(data[i][1]) if data[i][1] != cfg.WINDOW_SIGNATURE and \
+                                           data[i][1] != '' else cfg.VOID_SIGNATURE,
+                        str(data[i][2]) if data[i][2] != cfg.WINDOW_SIGNATURE and \
+                                           data[i][2] != '' else cfg.VOID_SIGNATURE,
+                        str(data[i][3])) if data[i][3] != cfg.WINDOW_SIGNATURE and \
+                                            data[i][3] != '' else cfg.VOID_SIGNATURE
+                    # result += cfg.ONE_PAIR_SHORT_PATTERN.format(i + 1, cfg.WINDOW_SIGNATURE)
                 else:
                     result += cfg.ONE_PAIR_SHORT_PATTERN.format(i + 1, cfg.WINDOW_SIGNATURE)
             else:
