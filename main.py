@@ -83,6 +83,9 @@ class VkBot:
             case cfg.BTN_WHAT_GROUP:
                 self._show_user_group(user_id)
                 return
+            case cfg.BTN_HELP:
+                self._show_help_message(user_id)
+                return
 
         combo_cmd = text.split(' ')
         match combo_cmd[0]:
@@ -93,11 +96,19 @@ class VkBot:
                     else:
                         self._edit_user_group(user_id, combo_cmd[1])
                     return
+                elif len(combo_cmd) == 3:
+                    if combo_cmd[1].lower() in cfg.WEEK_DAYS_INFINITIVE_SLUGS:
+                        if self._validate_group_slug(combo_cmd[2]):
+                            self._edit_user_group(user_id, combo_cmd[2])
+                            self._show_week_day_schedule(user_id, combo_cmd[1].lower())
+                        else:
+                            self._send_message(user_id, cfg.INVALID_GROUP_TEXT)
+                        return
 
         if str(user_id) in self.users_to_set_group:
             self._edit_user_group(user_id, text)
             return
-        self._send_message(user_id, cfg.INVALID_COMMAND_TEXT.format(cfg.BTN_HELP))
+        self._send_message(user_id, cfg.INVALID_COMMAND_TEXT.format(cfg.BTN_HELP.title()))
 
     def _get_week_schedule(self, group: str, date: datetime.datetime, with_reformat: bool = True) -> list:
         """
@@ -195,6 +206,15 @@ class VkBot:
             result += cfg.WEEK_DAYS_SLUGS[date.isocalendar().weekday - 1] + " "
         result += str(date.day) + " " + cfg.MONTHS_SLUGS[date.month % 12 - 1]
         return result
+
+    def _show_help_message(self, user_id: int):
+        """
+        Отправляет подсказку с командами
+
+        :param user_id:
+        :return:
+        """
+        self._send_message(user_id, cfg.HELP_TEXT)
 
     def _show_week_day_schedule(self, user_id: int, day: str) -> None:
         group = self._get_user_group(user_id)

@@ -27,6 +27,7 @@ CURRENT_WEEK_TEXT = 'Идёт {} неделя'
 SCHEDULE_SELECT_TEXT = 'Показать расписание ...'
 
 INVALID_COMMAND_TEXT = 'Неизвестная команда\nЧто бы получить список команд напиши \'{}\''
+HELP_TEXT = 'Нам никто не поможет :/'
 
 BTN_SCHEDULE_TODAY = 'на сегодня'
 BTN_SCHEDULE_TOMORROW = 'на завтра'
