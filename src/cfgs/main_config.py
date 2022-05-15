@@ -3,7 +3,7 @@ CMD_SCHEDULE = 'бот'
 
 SPLIT_PAIR_SEPARATOR = ' / '
 WINDOW_SIGNATURE = '--'
-VOID_SIGNATURE = '+'
+VOID_SIGNATURE = '_'
 ONE_PAIR_PATTERN = '{}) {}, {}, {}, {}\n'  # Номер, Предмет, Тип, Преподаватель, Аудитория
 ONE_PAIR_SHORT_PATTERN = '{}) {}\n'
 ONE_DAY_HEADER_PATTERN = '\nРасписание на {}:\n'  #

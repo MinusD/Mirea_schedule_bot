@@ -328,6 +328,7 @@ class VkBot:
         :return:
         """
         custom_week_pattern = r'кр. ([\d\,]+) н. ([^\\]+)'  # Кроме каких-то недель
+        custom_week_range_pattern = r'(\d+\-\d+) н. ([^\\]+)'  # Диапазон
         custom_week_is_set_pattern = r'([\d\,]+) н. ([^\\]+)'  # Включая эти недели
         custom_week_dirt_pattern = r'…'  # Заглушки в расписании
         # print(name, type(name), len(name))
@@ -341,16 +342,26 @@ class VkBot:
                     else:
                         data[i] = kr.group(2)
                 else:
-                    is_set = re.search(custom_week_is_set_pattern, data[i])
-                    if is_set:
-                        if str(week_number) in is_set.group(1).split(','):
-                            data[i] = is_set.group(2)
+                    range_week = re.search(custom_week_range_pattern, data[i])
+                    if range_week:
+                        tmp = range_week.group(1).split('-')
+                        from_week = int(tmp[0])
+                        to_week = int(tmp[1])
+                        if from_week <= week_number <= to_week:
+                            data[i] = range_week.group(2)
                         else:
                             data[i] = cfg.WINDOW_SIGNATURE
                     else:
-                        dirt = re.search(custom_week_dirt_pattern, data[i])
-                        if dirt:
-                            data[i] = cfg.WINDOW_SIGNATURE
+                        is_set = re.search(custom_week_is_set_pattern, data[i])
+                        if is_set:
+                            if str(week_number) in is_set.group(1).split(','):
+                                data[i] = is_set.group(2)
+                            else:
+                                data[i] = cfg.WINDOW_SIGNATURE
+                        else:
+                            dirt = re.search(custom_week_dirt_pattern, data[i])
+                            if dirt:
+                                data[i] = cfg.WINDOW_SIGNATURE
             return cfg.SPLIT_PAIR_SEPARATOR.join(data) if data else cfg.WINDOW_SIGNATURE
         return cfg.WINDOW_SIGNATURE
 

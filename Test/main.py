@@ -8,8 +8,9 @@ from bs4 import BeautifulSoup
 import src.cfgs.system_config as scfg
 
 if __name__ == '__main__':
-    now = datetime.datetime.now()
-    print(now.isocalendar())
+
+    # now = datetime.datetime.now()
+    # print(now.isocalendar())
 
     # a = [i for i in range(10)]
     # for i in range(len(a)):
