@@ -8,7 +8,13 @@ from bs4 import BeautifulSoup
 import src.cfgs.system_config as scfg
 
 if __name__ == '__main__':
-
+    response = requests.get(
+        'https://api.openweathermap.org/data/2.5/weather?q=moscow&appid=483841295963b30a56e7679ae38f99e1&units=metric'
+        '&lang=ru')
+    info = response.json()
+    print(info)
+    temp = info["main"]["temp"]
+    print(temp)
     # now = datetime.datetime.now()
     # print(now.isocalendar())
 

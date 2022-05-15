@@ -26,6 +26,8 @@ class VkBot:
         self.vk = self.vk_session.get_api()
         self.longpoll = VkLongPoll(self.vk_session)
         self.users_to_set_group: set = set()
+        self.users_to_set_teacher: set = set()
+        self.users_to_get_teacher: set = set()
         self.last_schedule_file_update: time
         self.schedule_data: list
         if scfg.UPDATE_SCHEDULE_FILE_ON_START:
@@ -104,6 +106,9 @@ class VkBot:
                         else:
                             self._send_message(user_id, cfg.INVALID_GROUP_TEXT)
                         return
+            case cfg.CMD_FIND_TEACHER:
+                self._show_teacher_keyboard(user_id, combo_cmd[1:])
+                return
 
         if str(user_id) in self.users_to_set_group:
             self._edit_user_group(user_id, text)
@@ -206,6 +211,52 @@ class VkBot:
             result += cfg.WEEK_DAYS_SLUGS[date.isocalendar().weekday - 1] + " "
         result += str(date.day) + " " + cfg.MONTHS_SLUGS[date.month % 12 - 1]
         return result
+
+    def _get_teacher_full_name(self, teacher: str) -> set[str]:
+        """
+        Получение полного имени преподавателей из расписания
+
+        :param teacher: Фамилия преподавателя
+        :return: Множество полных имён с заданной фамилией
+        """
+        result = set()
+        for i in range(2, len(self.schedule_data), 4):
+            for j in range(2, len(self.schedule_data[i])):
+                tmp = self.schedule_data[i][j].split('\n')
+                if len(tmp) > 0:
+                    if tmp[0].split(' ')[0] == teacher:
+                        result.add(tmp[0] if tmp[0][-1] == '.' else tmp[0] + '.')  # Исправление косяков расписания
+                    elif tmp[-1].split(' ')[0] == teacher:
+                        result.add(tmp[-1] if tmp[-1][-1] == '.' else tmp[-1] + '.')
+        return result
+
+    def _show_teacher_keyboard(self, user_id: int, teacher: list = None):
+        if len(teacher) == 2:
+            name = teacher[0].title() + ' ' + teacher[1].upper()
+        elif len(teacher) == 1:
+            tmp = []
+            for a in self._get_teacher_full_name(teacher[0].title()):
+                tmp.append(a)
+            if len(tmp) == 1:
+                name = tmp[0]
+            elif len(tmp) > 1:
+                self._add_user_to_set_teacher_list(user_id)  # Добавляем пользователя в список ожидания
+                keyboard = VkKeyboard(one_time=True)
+                print(tmp)
+                for i in range(len(tmp)):
+                    keyboard.add_button(tmp[i], color=VkKeyboardColor.SECONDARY)
+                    if i % 2 and i != len(tmp) - 1:
+                        keyboard.add_line()
+                self._send_message(user_id=user_id, text=cfg.TEACHER_SELECT_TEXT, custom_keyboard=keyboard)
+
+
+
+        else:
+            return
+        # print(name)
+        print(teacher)
+        Debug(f'Show teacher keyboard id {user_id}')
+        pass
 
     def _show_help_message(self, user_id: int):
         """
@@ -315,6 +366,16 @@ class VkBot:
         self.users_to_set_group.add(str(user_id))
         Debug(f'User add to set group list, uid: {user_id}', key='SET')
 
+    def _add_user_to_set_teacher_list(self, user_id) -> None:
+        """
+        Добавляет пользователя в список выбора преподавателя
+
+        :param user_id:
+        :return:
+        """
+        self.users_to_set_teacher.add(str(user_id))
+        Debug(f'User add to set teacher list, uid: {user_id}', key='SET')
+
     def _edit_user_group(self, user_id: int, group_slug: str) -> None:
         """
         Изменить группу пользователя или выдать ошибку
@@ -352,6 +413,8 @@ class VkBot:
         :return:
         """
         self.users_to_set_group.discard(str(user_id))
+        self.users_to_set_teacher.discard(str(user_id))
+        self.users_to_get_teacher.discard(str(user_id))
 
     def _validate_group_slug(self, group_slug: str) -> bool:
         """
@@ -366,7 +429,7 @@ class VkBot:
                 return True
         return False
 
-    def _reformat_subject_name(self, name: str or None, week_number: int, ignore_weeks: bool = False) -> str or None:
+    def _reformat_subject_name(self, name: str or None, week_number: int, ignore_weeks: bool = False) -> str | None:
         """
         Реформат названия предмета с проверкой его присутствия на определённой неделе
 
@@ -458,7 +521,8 @@ class VkBot:
                 result += cfg.ONE_PAIR_SHORT_PATTERN.format(i + 1, cfg.WINDOW_SIGNATURE)
         return result
 
-    def _send_message(self, user_id: int, text: str, keyboard: int = 0) -> None:
+    def _send_message(self, user_id: int, text: str = '', keyboard: int = 0,
+                      custom_keyboard: VkKeyboard = None) -> None:
         """
         Отправка сообщения
 
@@ -467,6 +531,7 @@ class VkBot:
         :param keyboard: 0 - Без клавиатуры(не менять), 1 - Стандартная клавиатура, 2 - Дополнительная(Настройки)
         :return:
         """
+
         if keyboard == 1:
             keyboard = VkKeyboard(one_time=False)
             keyboard.add_button(cfg.BTN_SCHEDULE_TODAY, color=VkKeyboardColor.POSITIVE)
@@ -478,7 +543,7 @@ class VkBot:
             keyboard.add_button(cfg.BTN_WHAT_WEEK.title(), color=VkKeyboardColor.SECONDARY)
             keyboard.add_button(cfg.BTN_WHAT_GROUP.title(), color=VkKeyboardColor.SECONDARY)
             keyboard.add_button(cfg.BTN_HELP.title(), color=VkKeyboardColor.SECONDARY)
-            keyboard.add_button(cfg.BTN_SETTINGS.title(), color=VkKeyboardColor.SECONDARY)
+            # keyboard.add_button(cfg.BTN_SETTINGS.title(), color=VkKeyboardColor.SECONDARY)
 
             # keyboard.add_button('Начать', color=VkKeyboardColor.NEGATIVE)
             # keyboard = VkKeyboard(one_time=True)
@@ -491,6 +556,8 @@ class VkBot:
             keyboard.add_button('321', color=VkKeyboardColor.NEGATIVE)
             keyboard.add_line()  # переход на вторую строку
             keyboard.add_button('Зелёная кнопка', color=VkKeyboardColor.POSITIVE)
+        if custom_keyboard:
+            keyboard = custom_keyboard
         if keyboard:
             self.vk.messages.send(
                 user_id=user_id,

@@ -1,5 +1,6 @@
 CMD_START = 'начать'
 CMD_SCHEDULE = 'бот'
+CMD_FIND_TEACHER = 'найти'
 
 SPLIT_PAIR_SEPARATOR = ' / '
 WINDOW_SIGNATURE = '--'
@@ -25,6 +26,7 @@ CURRENT_GROUP_TEXT = 'Я показываю расписание группы {}
 CURRENT_GROUP_ERROR_TEXT = 'Группа не выбрана, для выбора группы, напишите \n\'{}\' и номер группы'
 CURRENT_WEEK_TEXT = 'Идёт {} неделя'
 SCHEDULE_SELECT_TEXT = 'Показать расписание ...'
+TEACHER_SELECT_TEXT = 'Выберите преподавателя'
 
 INVALID_COMMAND_TEXT = 'Неизвестная команда\nЧто бы получить список команд напиши \'{}\''
 HELP_TEXT = 'Нам никто не поможет :/'
