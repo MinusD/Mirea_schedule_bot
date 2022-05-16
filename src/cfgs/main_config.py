@@ -8,6 +8,7 @@ VOID_SIGNATURE = '_'
 ONE_PAIR_PATTERN = '{}) {}, {}, {}, {}\n'  # Номер, Предмет, Тип, Преподаватель, Аудитория
 ONE_PAIR_SHORT_PATTERN = '{}) {}\n'
 ONE_DAY_HEADER_PATTERN = '\nРасписание на {}:\n'  #
+ONE_DAY_TEACHER_HEADER_PATTERN = '\nРасписание преподавателя {} на {}:\n'  #
 
 ODD_DAY_PATTERN = 'Расписание на {}, нечётной недели\n'
 EVEN_DAY_PATTERN = 'Расписание на {} чётной недели\n'

@@ -57,11 +57,19 @@ class VkBot:
         :param text:
         :return:
         """
-        # for i in range(len(self.users_to_get_teacher)):
-        #     if self.users_to_get_teacher[i][0] == user_id:
-        #         self._show_teacher_period_keyboard(user_id, self.users_to_get_teacher[i][1])
-        #         del self.users_to_get_teacher[i]
-        #         return
+        for i in range(len(self.users_to_get_teacher)):
+            if self.users_to_get_teacher[i][0] == user_id:
+                match text:
+                    case cfg.BTN_SCHEDULE_TODAY:
+                        self._show_today_teacher_schedule(user_id, self.users_to_get_teacher[i][1])
+                    case cfg.BTN_SCHEDULE_TOMORROW:
+                        self._show_today_teacher_schedule(user_id, self.users_to_get_teacher[i][1], 1)
+                    case cfg.BTN_SCHEDULE_WEEK:
+                        self._show_teacher_week_schedule(user_id, self.users_to_get_teacher[i][1])
+                    case cfg.BTN_SCHEDULE_NEXT_WEEK:
+                        self._show_teacher_week_schedule(user_id, self.users_to_get_teacher[i][1], 1)
+                del self.users_to_get_teacher[i]
+                return
 
         match text:
             case cfg.CMD_START:
@@ -240,9 +248,106 @@ class VkBot:
                         result.add(tmp[-1] if tmp[-1][-1] == '.' else tmp[-1] + '.')
         return result
 
-    # def _get_
+    def _get_teacher_week_schedule(self, teacher: str, date: datetime.datetime, with_reformat: bool = True) -> list:
+        """
+        Возвращает расписание преподавателя на указанную неделю
 
-    def _show_teacher_period_keyboard(self, user_id: int, teacher: str):
+        :param teacher:
+        :param date:
+        :param with_reformat:
+        :return:
+        """
+        now = date.isocalendar()
+        week = now.week + scfg.WEEK_DELTA
+        week_even = (week + 1) % 2  # Является ли неделя чётной
+        out = []
+        tmp = []
+        for j in range(2 + week_even, len(self.schedule_data[0]), 2):
+            para = []  # одна пара
+            for i in range(2, len(self.schedule_data), 4):  # Слева на права
+                tmp_teachers = self.schedule_data[i][j].split('\n')  # для сдвоенных пар
+                if len(tmp_teachers) > 0:
+                    t1 = tmp_teachers[0] if tmp_teachers[0][-1] == '.' else tmp_teachers[0] + '.'
+                    t2 = tmp_teachers[-1] if tmp_teachers[-1][-1] == '.' else tmp_teachers[-1] + '.'
+                    if t1 == teacher:
+                        para = [
+                            self.schedule_data[i - 2][j].split('\n')[0],  # Предмет
+                            self.schedule_data[i - 1][j].split('\n')[0],  # Вид
+                            self.schedule_data[i - 2][0],  # Группа
+                            self.schedule_data[i + 1][j].split('\n')[0]  # Аудитория
+                        ]
+                        break
+                    elif t2 == teacher:
+                        para = [
+                            self.schedule_data[i - 2][j].split('\n')[-1],  # Предмет
+                            self.schedule_data[i - 1][j].split('\n')[-1],  # Вид
+                            self.schedule_data[i - 2][0],  # Группа
+                            self.schedule_data[i + 1][j].split('\n')[-1]  # Аудитория
+                        ]
+                        break
+                    # Останавливаем смешение вправо, если нашли
+            tmp.append(para)  # Добавляем пару, даже если она пустая
+            if (j - week_even) % 12 == 0:
+                out.append(tmp)
+                tmp = []
+        for i in range(len(out)):
+            for j in range(6):
+                if len(out[i][j]) > 1:
+                    out[i][j][0] = self._reformat_subject_name(out[i][j][0], week_number=week,
+                                                               ignore_weeks=(not with_reformat))
+        return out
+
+    def _get_day_teacher_schedule(self, teacher: str, date: datetime.datetime) -> list:
+        """
+        Возращает расписание преподавателя на переданный день
+
+        :param teacher:
+        :param date:
+        :return:
+        """
+        week = self._get_teacher_week_schedule(teacher, date)
+        week_index = date.isocalendar().weekday - 1
+        if week_index == 6:
+            return [[] * 4] * 6
+        return week[week_index]
+
+    def _show_today_teacher_schedule(self, user_id: int, teacher: str, day_delta: int = 0) -> None:
+        """
+        Выводит расписания на сегодня день(со смещением)
+
+        :param user_id:
+        :param teacher:
+        :param day_delta: Сколько дней вперёд
+        :return:
+        """
+        now = datetime.datetime.now() + datetime.timedelta(days=day_delta)
+        teacher = self._reformat_teacher_name(teacher)
+        if self._validate_teacher_name(teacher):
+            schedule = self._get_day_teacher_schedule(teacher, now)
+            self._send_message(user_id=user_id, text=self._reformat_day_schedule(schedule, now, teacher_header=teacher))
+
+    def _show_teacher_week_schedule(self, user_id: int, teacher: str, week_delta: int = 0) -> None:
+        """
+        Выводит расписание преподавателя на неделю
+
+        :param user_id:
+        :param teacher:
+        :param week_delta:
+        :return:
+        """
+        now = datetime.datetime.now() + datetime.timedelta(weeks=week_delta)
+        day_date = now - datetime.timedelta(days=now.isocalendar().weekday - 1)
+        result = ''
+        teacher = self._reformat_teacher_name(teacher)
+        if self._validate_teacher_name(teacher):
+            schedule = self._get_teacher_week_schedule(teacher, now)
+            for i in range(6):
+                result += self._reformat_day_schedule(schedule[i], date=day_date, teacher_header=teacher,
+                                                      week_format=True)
+                day_date += datetime.timedelta(days=1)
+            self._send_message(user_id, result)
+
+    def _show_teacher_period_keyboard(self, user_id: int, teacher: str) -> None:
         tmp = teacher.split(' ')
         if len(tmp) == 2:
             teacher = tmp[0].title() + ' ' + tmp[1].upper()
@@ -254,12 +359,20 @@ class VkBot:
                 keyboard.add_button(cfg.BTN_SCHEDULE_WEEK, color=VkKeyboardColor.PRIMARY)
                 keyboard.add_button(cfg.BTN_SCHEDULE_NEXT_WEEK, color=VkKeyboardColor.PRIMARY)
                 self._clear_wait_lists(user_id)
-                self._add_user_to_set_teacher_list(user_id)
-                self._send_message(user_id, text=cfg.TEACHER_SELECT_PERIOD_TEXT.format(teacher), custom_keyboard=keyboard)
+                self._add_user_to_get_teacher_list(user_id, teacher)
+                self._send_message(user_id, text=cfg.TEACHER_SELECT_PERIOD_TEXT.format(teacher),
+                                   custom_keyboard=keyboard)
                 return
         self._send_message(user_id, text=cfg.TEACHER_SELECT_ERROR_TEXT)
 
     def _show_teacher_keyboard(self, user_id: int, teacher: list = None):
+        """
+        Показывает клавиатуру выбора преподавателя, либо выбора периода, для показа расписания
+
+        :param user_id:
+        :param teacher:
+        :return:
+        """
         name = ''
         if len(teacher) == 2:
             name = teacher[0].title() + ' ' + teacher[1].upper()
@@ -547,7 +660,8 @@ class VkBot:
         return cfg.WINDOW_SIGNATURE
 
     def _reformat_day_schedule(self, data: list, date: datetime.datetime = datetime.datetime.now(),
-                               week_format: bool = False, with_header: bool = True) -> str:
+                               week_format: bool = False, with_header: bool = True,
+                               teacher_header: str | None = None) -> str:
         """
         Форматирует один день из списка в строку для дальнейшего вывода
 
@@ -558,7 +672,12 @@ class VkBot:
 
         result = ''
         if with_header:
-            result += cfg.ONE_DAY_HEADER_PATTERN.format(self._get_string_date(date, with_week_day=week_format))  # Дата
+            if teacher_header:
+                result += cfg.ONE_DAY_TEACHER_HEADER_PATTERN.format(
+                    teacher_header, self._get_string_date(date, with_week_day=week_format))  # Дата
+            else:
+                result += cfg.ONE_DAY_HEADER_PATTERN.format(
+                    self._get_string_date(date, with_week_day=week_format))  # Дата
         for i in range(len(data)):
             if len(data[i]) > 1:
                 if data[i][0][:len(cfg.WINDOW_SIGNATURE)] != cfg.WINDOW_SIGNATURE:
@@ -577,6 +696,20 @@ class VkBot:
             else:
                 result += cfg.ONE_PAIR_SHORT_PATTERN.format(i + 1, cfg.WINDOW_SIGNATURE)
         return result
+
+    def _reformat_teacher_name(self, teacher: str) -> str:
+        """
+        Форматирует имя преподавателя
+
+        :param teacher:
+        :return:
+        """
+        tmp = teacher.split(' ')
+        if len(tmp) == 2:
+            teacher = tmp[0].title() + ' ' + tmp[1].upper()
+        elif len(tmp) == 1:
+            teacher = tmp[0].title()
+        return teacher
 
     def _send_message(self, user_id: int, text: str = '', keyboard: int = 0,
                       custom_keyboard: VkKeyboard = None) -> None:
