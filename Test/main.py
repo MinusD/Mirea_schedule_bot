@@ -8,13 +8,50 @@ from bs4 import BeautifulSoup
 import src.cfgs.system_config as scfg
 
 if __name__ == '__main__':
-    response = requests.get(
-        'https://api.openweathermap.org/data/2.5/weather?q=moscow&appid=483841295963b30a56e7679ae38f99e1&units=metric'
-        '&lang=ru')
-    info = response.json()
-    print(info)
-    temp = info["main"]["temp"]
-    print(temp)
+    region = 'Татарстан'
+    page = requests.get(scfg.CORONA_STAT_URL + '/country/russia')  # Получаем страницу
+    soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
+    result = soup.findAll('div', {'class': 'c_search_row'})
+    d = ''
+    for x in result:
+        tmp = x.find('span', 'small').find('a')
+        if region.title() in tmp.getText().split(' '):
+            rg = tmp.getText()
+            d = tmp.get('href')
+    print('URL:', scfg.CORONA_STAT_URL + d)
+    page = requests.get(scfg.CORONA_STAT_URL + d)  # Получаем страницу
+    soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
+    result = soup.find(string='Прогноз заражения на 10 дней').find_parent('div',
+                                                                          {'class': 'border rounded mt-3 mb-3 p-3'})
+    status = result.find('h6', 'text-muted').getText()[:-17]
+    print(status)
+    print(rg)
+
+    # result = soup.find(string="Институт информационных технологий").find_parent("div").find_parent("div").findAll(
+    #     'a', {'class': 'uk-link-toggle'})
+
+    # course_pattern = r'([1-3]) курс'
+    # for x in result:
+    #     course = x.find('div', 'uk-link-heading').text.lower().strip()
+    #     course_number = re.match(course_pattern, course)
+    #     if course_number:
+    #         course_number = course_number.group(1)
+    #         f = open(f'{scfg.DATA_DIR}{scfg.SCHEDULE_BASE_NAME}{course_number}.xlsx', "wb")
+    #         link = x.get('href')
+    #         resp = requests.get(link)  # запрос по ссылке
+    #         f.write(resp.content)  # Записываем контент в файл
+    #         f.close()
+    # self.last_schedule_file_update = time.time()
+    # Debug('Update schedule files', key='UPD')
+    # self._parse_schedule_file()
+
+    # response = requests.get(
+    #     'https://api.openweathermap.org/data/2.5/weather?q=moscow&appid=483841295963b30a56e7679ae38f99e1&units=metric'
+    #     '&lang=ru')
+    # info = response.json()
+    # print(info)
+    # temp = info["main"]["temp"]
+    # print(temp)
     # now = datetime.datetime.now()
     # print(now.isocalendar())
 

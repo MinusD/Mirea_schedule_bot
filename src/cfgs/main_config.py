@@ -1,6 +1,7 @@
 CMD_START = 'начать'
 CMD_SCHEDULE = 'бот'
 CMD_FIND_TEACHER = 'найти'
+CMD_CORONA = 'корона'
 
 SPLIT_PAIR_SEPARATOR = ' / '
 WINDOW_SIGNATURE = '--'

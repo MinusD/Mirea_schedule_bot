@@ -4,6 +4,7 @@ import openpyxl
 import requests
 import time
 import re
+import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
 
 # Сторонние библиотеки
@@ -102,6 +103,9 @@ class VkBot:
             case cfg.BTN_HELP:
                 self._show_help_message(user_id)
                 return
+            case cfg.CMD_CORONA:
+
+                return
 
         combo_cmd = text.split(' ')
         match combo_cmd[0]:
@@ -123,6 +127,9 @@ class VkBot:
             case cfg.CMD_FIND_TEACHER:
                 self._show_teacher_keyboard(user_id, combo_cmd[1:])
                 return
+            case cfg.CMD_CORONA:
+                self._show_corona_local_data(user_id, combo_cmd[1:])
+                pass
 
         if str(user_id) in self.users_to_set_group:
             self._edit_user_group(user_id, text)
@@ -130,7 +137,6 @@ class VkBot:
         if str(user_id) in self.users_to_set_teacher:
             self._show_teacher_period_keyboard(user_id, text)
             return
-
         self._send_message(user_id, cfg.INVALID_COMMAND_TEXT.format(cfg.BTN_HELP.title()))
 
     def _get_week_schedule(self, group: str, date: datetime.datetime, with_reformat: bool = True) -> list:
@@ -310,6 +316,26 @@ class VkBot:
         if week_index == 6:
             return [[] * 4] * 6
         return week[week_index]
+
+    def _get_corona_stat(self, extra_url: str = '') -> None:
+        page = requests.get(scfg.CORONA_STAT_URL + extra_url)  # Получаем страницу
+        soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
+        result = soup.findAll('div', {'class': 'c_search_row'})
+        for x in result:
+            tmp = x.find('span', 'small').find('a')
+            if region.title() in tmp.getText().split(' '):
+                print(tmp.get('href'))
+
+    def _show_corona_local_data(self, user_id: int, region_list: list) -> None:
+        if len(region_list) > 0:
+            region = region_list[0].title()
+            page = requests.get(scfg.CORONA_STAT_URL + '/country/russia')  # Получаем страницу
+            soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
+            result = soup.findAll('div', {'class': 'c_search_row'})
+            for x in result:
+                tmp = x.find('span', 'small').find('a')
+                if region.title() in tmp.getText().split(' '):
+                    print(tmp.get('href'))
 
     def _show_today_teacher_schedule(self, user_id: int, teacher: str, day_delta: int = 0) -> None:
         """

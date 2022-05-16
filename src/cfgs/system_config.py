@@ -1,7 +1,8 @@
 TOKEN: str = 'dfb468c2e5cf615a4c9f534eba0ded63bd20d15a4576743f1154f15ccf86bdd2296dc24e251d91117a043'
 WEATHER_TOKEN: str = '483841295963b30a56e7679ae38f99e1'
 MIREA_SCHEDULE_URL: str = 'https://www.mirea.ru/schedule/'
-WEATHER_URL = 'https://api.openweathermap.org/data/2.5/weather?q=moscow&appid={}&units=metric&lang=ru'
+WEATHER_URL: str = 'https://api.openweathermap.org/data/2.5/weather?q=moscow&appid={}&units=metric&lang=ru'
+CORONA_STAT_URL: str = 'https://coronavirusstat.ru'
 DEBUG_MODE: bool = True
 LOG_MODE: bool = True
 UPDATE_SCHEDULE_FILE_ON_START: bool = False
