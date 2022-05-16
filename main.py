@@ -27,7 +27,7 @@ class VkBot:
         self.longpoll = VkLongPoll(self.vk_session)
         self.users_to_set_group: set = set()
         self.users_to_set_teacher: set = set()
-        self.users_to_get_teacher: set = set()
+        self.users_to_get_teacher: list = []
         self.last_schedule_file_update: time
         self.schedule_data: list
         if scfg.UPDATE_SCHEDULE_FILE_ON_START:
@@ -57,6 +57,12 @@ class VkBot:
         :param text:
         :return:
         """
+        # for i in range(len(self.users_to_get_teacher)):
+        #     if self.users_to_get_teacher[i][0] == user_id:
+        #         self._show_teacher_period_keyboard(user_id, self.users_to_get_teacher[i][1])
+        #         del self.users_to_get_teacher[i]
+        #         return
+
         match text:
             case cfg.CMD_START:
                 user_data = self.vk.users.get(user_id=user_id)[0]
@@ -113,6 +119,10 @@ class VkBot:
         if str(user_id) in self.users_to_set_group:
             self._edit_user_group(user_id, text)
             return
+        if str(user_id) in self.users_to_set_teacher:
+            self._show_teacher_period_keyboard(user_id, text)
+            return
+
         self._send_message(user_id, cfg.INVALID_COMMAND_TEXT.format(cfg.BTN_HELP.title()))
 
     def _get_week_schedule(self, group: str, date: datetime.datetime, with_reformat: bool = True) -> list:
@@ -230,35 +240,51 @@ class VkBot:
                         result.add(tmp[-1] if tmp[-1][-1] == '.' else tmp[-1] + '.')
         return result
 
+    # def _get_
+
+    def _show_teacher_period_keyboard(self, user_id: int, teacher: str):
+        tmp = teacher.split(' ')
+        if len(tmp) == 2:
+            teacher = tmp[0].title() + ' ' + tmp[1].upper()
+            if self._validate_teacher_name(teacher):
+                keyboard = VkKeyboard(one_time=True)
+                keyboard.add_button(cfg.BTN_SCHEDULE_TODAY, color=VkKeyboardColor.POSITIVE)
+                keyboard.add_button(cfg.BTN_SCHEDULE_TOMORROW, color=VkKeyboardColor.NEGATIVE)
+                keyboard.add_line()
+                keyboard.add_button(cfg.BTN_SCHEDULE_WEEK, color=VkKeyboardColor.PRIMARY)
+                keyboard.add_button(cfg.BTN_SCHEDULE_NEXT_WEEK, color=VkKeyboardColor.PRIMARY)
+                self._clear_wait_lists(user_id)
+                self._add_user_to_set_teacher_list(user_id)
+                self._send_message(user_id, text=cfg.TEACHER_SELECT_PERIOD_TEXT.format(teacher), custom_keyboard=keyboard)
+                return
+        self._send_message(user_id, text=cfg.TEACHER_SELECT_ERROR_TEXT)
+
     def _show_teacher_keyboard(self, user_id: int, teacher: list = None):
+        name = ''
         if len(teacher) == 2:
             name = teacher[0].title() + ' ' + teacher[1].upper()
-        elif len(teacher) == 1:
+        elif len(teacher) == 1:  # Только фамилия
             tmp = []
             for a in self._get_teacher_full_name(teacher[0].title()):
                 tmp.append(a)
-            if len(tmp) == 1:
+            if len(tmp) == 1:  # Если 1, то
                 name = tmp[0]
             elif len(tmp) > 1:
                 self._add_user_to_set_teacher_list(user_id)  # Добавляем пользователя в список ожидания
                 keyboard = VkKeyboard(one_time=True)
-                print(tmp)
                 for i in range(len(tmp)):
                     keyboard.add_button(tmp[i], color=VkKeyboardColor.SECONDARY)
-                    if i % 2 and i != len(tmp) - 1:
+                    if i % 2 and i != len(tmp) - 1:  # Каждый второй, но не последний
                         keyboard.add_line()
                 self._send_message(user_id=user_id, text=cfg.TEACHER_SELECT_TEXT, custom_keyboard=keyboard)
-
-
-
-        else:
+                Debug(f'Show teacher keyboard id {user_id}')
+                return
+        if len(name) > 1:
+            self._show_teacher_period_keyboard(user_id, name)
             return
-        # print(name)
-        print(teacher)
-        Debug(f'Show teacher keyboard id {user_id}')
-        pass
+        self._send_message(user_id, cfg.TEACHER_SELECT_ERROR_TEXT)
 
-    def _show_help_message(self, user_id: int):
+    def _show_help_message(self, user_id: int) -> None:
         """
         Отправляет подсказку с командами
 
@@ -376,6 +402,16 @@ class VkBot:
         self.users_to_set_teacher.add(str(user_id))
         Debug(f'User add to set teacher list, uid: {user_id}', key='SET')
 
+    def _add_user_to_get_teacher_list(self, user_id, teacher: str) -> None:
+        """
+        Добавляет пользователя в список выбора преподавателя
+
+        :param user_id:
+        :return:
+        """
+        self.users_to_get_teacher.append([user_id, teacher])
+        Debug(f'User add to get teacher list, uid: {user_id}', key='SET')
+
     def _edit_user_group(self, user_id: int, group_slug: str) -> None:
         """
         Изменить группу пользователя или выдать ошибку
@@ -414,7 +450,28 @@ class VkBot:
         """
         self.users_to_set_group.discard(str(user_id))
         self.users_to_set_teacher.discard(str(user_id))
-        self.users_to_get_teacher.discard(str(user_id))
+        for i in range(len(self.users_to_get_teacher)):
+            if self.users_to_get_teacher[i][0] == user_id:
+                del self.users_to_get_teacher[i]
+                break
+
+    def _validate_teacher_name(self, teacher: str) -> bool:
+        """
+        Проверяет наличие преподавателя в файлах расписания
+
+        :param teacher:
+        :return:
+        """
+        for i in range(2, len(self.schedule_data), 4):
+            for j in range(2, len(self.schedule_data[i])):
+                tmp = self.schedule_data[i][j].split('\n')  # для сдвоенных пар
+                if len(tmp) > 0:
+                    t1 = tmp[0] if tmp[0][-1] == '.' else tmp[0] + '.'
+                    t2 = tmp[-1] if tmp[-1][-1] == '.' else tmp[-1] + '.'
+                    if t1 == teacher or t2 == teacher:
+                        Debug(f'Find teacher {t1} or {t2}', key='FND')
+                        return True
+        return False
 
     def _validate_group_slug(self, group_slug: str) -> bool:
         """
