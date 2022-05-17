@@ -37,6 +37,7 @@ TEACHER_SELECT_PERIOD_TEXT = 'Показать расписание препод
 TEACHER_SELECT_ERROR_TEXT = 'Преподаватель не найден'
 GRAF_HEADER_TEXT = 'Россия - Детальная статистика - коронавирус'
 GRAF_LABEL_TEXT = 'Количество - Миллионы'
+WEATHER_SELECT_TEXT = 'Показать погоду в Москве'
 
 INVALID_COMMAND_TEXT = 'Неизвестная команда\nЧто бы получить список команд напиши \'{}\''
 HELP_TEXT = 'Нам никто не поможет :/'
@@ -49,3 +50,8 @@ BTN_WHAT_WEEK = 'неделя?'  # 'Какая неделя?'
 BTN_WHAT_GROUP = 'группа?'  # 'Какая группа?'
 BTN_SETTINGS = 'настройки'
 BTN_HELP = 'помощь'
+
+BTN_WEATHER_NOW = 'сейчас'
+BTN_WEATHER_TODAY = 'сегодня'
+BTN_WEATHER_TOMORROW = 'завтра'
+BTN_WEATHER_FIVE_DAYS = 'на 5 дней'

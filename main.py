@@ -112,6 +112,9 @@ class VkBot:
             case cfg.CMD_WEATHER:
                 self._show_weather_keyboard(user_id)
                 return
+            case cfg.BTN_WEATHER_NOW:
+
+                return
 
         combo_cmd = text.split(' ')
         match combo_cmd[0]:
@@ -416,7 +419,13 @@ class VkBot:
         :param user_id:
         :return:
         """
-        pass
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button(cfg.BTN_WEATHER_NOW, color=VkKeyboardColor.PRIMARY)
+        keyboard.add_button(cfg.BTN_WEATHER_TODAY, color=VkKeyboardColor.POSITIVE)
+        keyboard.add_button(cfg.BTN_WEATHER_TOMORROW, color=VkKeyboardColor.POSITIVE)
+        keyboard.add_line()
+        keyboard.add_button(cfg.BTN_WEATHER_FIVE_DAYS, color=VkKeyboardColor.POSITIVE)
+        self._send_message(user_id, text=cfg.WEATHER_SELECT_TEXT, custom_keyboard=keyboard)
 
     def _show_corona_local_data(self, user_id: int, region_list: list) -> None:
         """
