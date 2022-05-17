@@ -15,6 +15,8 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.utils import get_random_id
 from vk_api import VkUpload
+from PIL import Image, ImageDraw, ImageFont
+from urllib.request import urlopen
 
 # Самописные модули
 from src.helper_module import *
@@ -113,7 +115,7 @@ class VkBot:
                 self._show_weather_keyboard(user_id)
                 return
             case cfg.BTN_WEATHER_NOW:
-
+                self._show_now_weather(user_id)
                 return
 
         combo_cmd = text.split(' ')
@@ -381,6 +383,103 @@ class VkBot:
         died = list(reversed(died))
         cases = list(reversed(cases))
         return days, active, cured, died, cases
+
+    def _get_wind_slug(self, speed: float) -> str:
+        """
+        Возвращает словесное название  ветра по шкале Бофорта
+
+        :param speed:
+        :return:
+        """
+        s = 'Ураган'
+        if speed <= 0.2:
+            s = 'Штиль'
+        elif speed <= 1.5:
+            s = 'Тихий'
+        elif speed <= 3.3:
+            s = 'Лёгкий'
+        elif speed <= 5.4:
+            s = 'Слабый'
+        elif speed <= 7.9:
+            s = 'Умеренный'
+        elif speed <= 10.7:
+            s = 'Свежий'
+        elif speed <= 13.8:
+            s = 'Сильный'
+        elif speed <= 17.1:
+            s = 'Крепкий'
+        elif speed <= 20.7:
+            s = 'Очень крепкий'
+        elif speed <= 24.4:
+            s = 'Шторм'
+        elif speed <= 28.4:
+            s = 'Сильный шторм'
+        elif speed <= 32.6:
+            s = 'Жестокий шторм'
+        return s
+
+    def _get_wind_deg_slug(self, deg: int) -> str:
+        """
+        Возращает буквенное направление ветра
+
+        :param deg: Угол ветра
+        :return:
+        """
+        s = 'северный'
+        if deg <= 22.5:
+            s = 'северный'
+        elif deg <= 67.5:
+            s = 'северо-восточный'
+        elif deg <= 112.5:
+            s = 'восточный'
+        elif deg <= 157.5:
+            s = 'юго-восточный'
+        elif deg <= 202.5:
+            s = 'южный'
+        elif deg <= 247.5:
+            s = 'юго-западный'
+        elif deg <= 292.5:
+            s = 'западный'
+        elif deg <= 292.5:
+            s = 'северо-западный'
+        return s
+
+    def _show_now_weather(self, user_id: int) -> None:
+        upload = VkUpload(self.vk_session)
+        attachments = []
+        image = Image.open('src/assets/weather_pattern.jpg')
+        # img = image.resize((400, 500))
+        img = image.resize((400, 260))
+        img = img.convert('RGB')
+        idraw = ImageDraw.Draw(img)
+        title = ImageFont.truetype(font='src/assets/lato.ttf', size=30)
+        font = ImageFont.truetype(font='src/assets/lato.ttf', size=18)
+        # title2 = ImageFont.truetype(size=30)
+        idraw.text((10, 10), 'Погода в Москве', font=title, fill="white")
+        response = requests.get("http://api.openweathermap.org/data/2.5/weather",
+                                params={'q': 'moscow,ru', 'units': 'metric', 'APPID': scfg.WEATHER_TOKEN, 'lang': 'ru'})
+        info = response.json()
+        pattern = '{}, температура: {}°C\nДавление: {} мм рт. сб., влажность: {}%\nВетер: {}, {} м/с, {}'
+        img_name = info['weather'][0]['icon']
+        im = Image.open(urlopen('https://openweathermap.org/img/wn/{}@4x.png'.format(img_name)))
+        img.paste(im, (95, 20), im.convert('RGBA'))
+        status = info['weather'][0]['description'].capitalize()
+        temp = str(int(info['main']['temp_min'])) + ' - ' + str(int(info['main']['temp_max']))
+        pressure = str(int(float(info['main']['pressure']) / 1.33))
+        humidity = str(info['main']['humidity'])
+        wind_speed = info['wind']['speed']
+        wind_slug = self._get_wind_slug(float(wind_speed)).lower()
+        wind_deg_slug = self._get_wind_deg_slug(info['wind']['speed'])
+        weather = pattern.format(status, temp, pressure, humidity, wind_slug, wind_speed, wind_deg_slug)
+        idraw.text((10, 185), weather, font=font, fill="white")
+
+        img.save('data/weather_card.png')
+
+        photo = upload.photo_messages(scfg.DATA_DIR + 'weather_card.png')[0]
+        attachments.append("photo{}_{}".format(photo["owner_id"], photo["id"]))
+
+        self._send_message_with_attachments(user_id=user_id, text='Сейчас', attachments=attachments)
+
 
     def _show_corona_all_stat(self, user_id: int) -> None:
         """
