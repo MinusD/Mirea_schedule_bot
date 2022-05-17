@@ -4,29 +4,115 @@ import requests
 import openpyxl
 import pickle
 import re
+
+import matplotlib.pyplot as plt
+import numpy as np
+
 from bs4 import BeautifulSoup
 import src.cfgs.system_config as scfg
 
 if __name__ == '__main__':
-    region = 'Татарстан'
+
     page = requests.get(scfg.CORONA_STAT_URL + '/country/russia')  # Получаем страницу
     soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
-    result = soup.findAll('div', {'class': 'c_search_row'})
-    d = ''
-    for x in result:
-        tmp = x.find('span', 'small').find('a')
-        if region.title() in tmp.getText().split(' '):
-            rg = tmp.getText()
-            d = tmp.get('href')
-    print('URL:', scfg.CORONA_STAT_URL + d)
-    page = requests.get(scfg.CORONA_STAT_URL + d)  # Получаем страницу
-    soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
-    result = soup.find(string='Прогноз заражения на 10 дней').find_parent('div',
-                                                                          {'class': 'border rounded mt-3 mb-3 p-3'})
-    status = result.find('h6', 'text-muted').getText()[:-17]
-    print(status)
-    print(rg)
+    result = soup.find('table', {'class': 'table table-bordered small'}).findAll('tr')
+    # days = active = cured = died = cases = stats = []
+    days = []
+    active = []
+    cured = []
+    died = []
+    cases = []
+    stats = []
+    ml = 1000000
+    for i in range(1, 11):
+        days.append(result[i].find('th').getText())
+        for a in result[i].findAll('td'):
+            stats.append(int(a.getText().split(' ')[1]))
+    for i in range(0, len(stats), 4):
+        active.append(stats[i] / ml)
+    for i in range(1, len(stats), 4):
+        cured.append(stats[i] / ml)
+    for i in range(2, len(stats), 4):
+        died.append(stats[i] / ml)
+    for i in range(3, len(stats), 4):
+        cases.append(stats[i] / ml)
+    var = days, active, cured, died, cases
+    population_by_continent = {
+        'Активных': active,
+        'Вылечено': cured,
+        'Умерло': died,
+        # 'europe': cases,
+    }
+    for i in range(len(days)):
+        days[i] = days[i][:-5]
+        # if i % 2:
+        #     days[i] = '_'
+    # print(days)
+    days = list(reversed(days))
+    fig, ax = plt.subplots()
+    ax.stackplot(days, population_by_continent.values(),
+                 labels=population_by_continent.keys(), alpha=0.8)
 
+    ax.legend(loc='upper left')
+    ax.set_title('World population')
+    ax.set_xlabel('Year')
+    ax.set_ylabel('Number of people (millions)')
+
+    plt.show()
+
+    # page = requests.get(scfg.CORONA_STAT_URL + '/country/russia')  # Получаем страницу
+    # soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
+    # result = soup.find('table', {'class': 'table table-bordered small'}).findAll('tr')
+    # active = []
+    # cured = []
+    # died = []
+    # cases = []
+    # stats = []
+    # for i in range(1, 11):
+    #     for a in result[i].findAll('td'):
+    #         stats.append(int(a.getText().split(' ')[1]))
+    # for i in range(0, len(stats), 4):
+    #     active.append(stats[i])
+    # for i in range(1, len(stats), 4):
+    #     cured.append(stats[i])
+    # for i in range(2, len(stats), 4):
+    #     died.append(stats[i])
+    # for i in range(3, len(stats), 4):
+    #     cases.append(stats[i])
+    # print(active)
+    # print(cured)
+    # print(died)
+    # print(cases)
+
+    # print(result)
+
+    # region = 'Москва'
+    # page = requests.get(scfg.CORONA_STAT_URL + '/country/russia')  # Получаем страницу
+    # soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
+    # result = soup.findAll('div', {'class': 'c_search_row'})
+    # d = ''
+    # for x in result:
+    #     tmp = x.find('span', 'small').find('a')
+    #     if region.title() in tmp.getText().split(' '):
+    #         rg = tmp.getText()
+    #         d = tmp.get('href')
+    # print('URL:', scfg.CORONA_STAT_URL + d)
+    # page = requests.get(scfg.CORONA_STAT_URL + d)  # Получаем страницу
+    # soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
+    # result = soup.find(string='Прогноз заражения на 10 дней').find_parent('div',
+    #                                                                       {'class': 'border rounded mt-3 mb-3 p-3'})
+    # status = result.find('h6', 'text-muted').getText()[:-17]
+    #
+    # print(status)
+    # print(rg)
+    # data = result.findAll('div', {'class': 'col col-6 col-md-3 pt-4'})
+    # plus = []
+    # value = []
+    # for i in range(4):
+    #     value.append(data[i].find('div', 'h2').getText())
+    #     plus.append(data[i].find('span', {'class': 'font-weight-bold'}).getText())
+    # print(value)
+    # print(plus)
     # result = soup.find(string="Институт информационных технологий").find_parent("div").find_parent("div").findAll(
     #     'a', {'class': 'uk-link-toggle'})
 

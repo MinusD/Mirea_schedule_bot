@@ -13,6 +13,7 @@ GROUP_PATTERN: str = r'\w{4}-\d{2}-\d{2}'  # Паттерн группы
 
 TABLE_NAME: str = 'groups'
 
+GRAF_FILENAME = 'graf.png'
 LOG_FILENAME: str = 'log.txt'
 DATABASE_FILENAME: str = 'vk_bot_data.db'
 MAIN_DIR: str = 'src/'

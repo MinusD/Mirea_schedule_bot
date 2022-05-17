@@ -1,5 +1,7 @@
 # Встроенные библиотеки
 import datetime
+from typing import Tuple, Any, List
+
 import openpyxl
 import requests
 import time
@@ -12,6 +14,7 @@ import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.utils import get_random_id
+from vk_api import VkUpload
 
 # Самописные модули
 from src.helper_module import *
@@ -104,7 +107,10 @@ class VkBot:
                 self._show_help_message(user_id)
                 return
             case cfg.CMD_CORONA:
-
+                self._show_corona_all_stat(user_id)
+                return
+            case cfg.CMD_WEATHER:
+                self._show_weather_keyboard(user_id)
                 return
 
         combo_cmd = text.split(' ')
@@ -129,7 +135,7 @@ class VkBot:
                 return
             case cfg.CMD_CORONA:
                 self._show_corona_local_data(user_id, combo_cmd[1:])
-                pass
+                return
 
         if str(user_id) in self.users_to_set_group:
             self._edit_user_group(user_id, text)
@@ -317,25 +323,123 @@ class VkBot:
             return [[] * 4] * 6
         return week[week_index]
 
-    def _get_corona_stat(self, extra_url: str = '') -> None:
+    def _get_corona_stat(self, extra_url: str = '') -> tuple[str, list[Any], list[Any]]:
+        """
+        Возвращает статистику коронавируса на сегодня определённой области
+
+        :param extra_url:
+        :return:
+        """
         page = requests.get(scfg.CORONA_STAT_URL + extra_url)  # Получаем страницу
         soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
-        result = soup.findAll('div', {'class': 'c_search_row'})
-        for x in result:
-            tmp = x.find('span', 'small').find('a')
-            if region.title() in tmp.getText().split(' '):
-                print(tmp.get('href'))
+        result = soup.find(string='Прогноз заражения на 10 дней').find_parent('div', {
+            'class': 'border rounded mt-3 mb-3 p-3'})
+        status = result.find('h6', 'text-muted').getText()[:-17]
+        data = result.findAll('div', {'class': 'col col-6 col-md-3 pt-4'})
+        plus = [] * 4
+        value = [] * 4
+        for i in range(4):
+            value.append(data[i].find('div', 'h2').getText())
+            plus.append(data[i].find('span', {'class': 'font-weight-bold'}).getText())
+        return status, value, plus
+
+    def _get_corona_all_stat(self) -> tuple[list[Any], list[float], list[float], list[float], list[float]]:
+        """
+        Возвращает статистику коронавируса на последние 10 дней
+
+        :return:
+        """
+        page = requests.get(scfg.CORONA_STAT_URL + '/country/russia')  # Получаем страницу
+        soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
+        result = soup.find('table', {'class': 'table table-bordered small'}).findAll('tr')
+        # days = active = cured = died = cases = stats = []
+        days = []
+        active = []
+        cured = []
+        died = []
+        cases = []
+        stats = []
+        ml = 1000000
+        for i in range(1, 11):
+            days.append(result[i].find('th').getText())
+            for a in result[i].findAll('td'):
+                stats.append(int(a.getText().split(' ')[1]))
+        for i in range(0, len(stats), 4):
+            active.append(stats[i] / ml)
+        for i in range(1, len(stats), 4):
+            cured.append(stats[i] / ml)
+        for i in range(2, len(stats), 4):
+            died.append(stats[i] / ml)
+        for i in range(3, len(stats), 4):
+            cases.append(stats[i] / ml)
+        days = list(reversed(days))
+        active = list(reversed(active))
+        cured = list(reversed(cured))
+        died = list(reversed(died))
+        cases = list(reversed(cases))
+        return days, active, cured, died, cases
+
+    def _show_corona_all_stat(self, user_id: int) -> None:
+        """
+        Показывает статистику коронавируса на сегодня и выводит график
+
+        :param user_id:
+        :return:
+        """
+        days, active, cured, died, cases = self._get_corona_all_stat()
+        graf_data = {
+            'Активных': active,
+            'Вылечено': cured,
+            'Умерло': died,
+        }
+        for i in range(len(days)):
+            days[i] = days[i][:-5]
+        fig, ax = plt.subplots()
+        ax.stackplot(days, graf_data.values(),
+                     labels=graf_data.keys(), alpha=0.8)
+        ax.legend(loc='upper left')
+        ax.set_title(cfg.GRAF_HEADER_TEXT)
+        ax.set_ylabel(cfg.GRAF_LABEL_TEXT)
+        fig.savefig(scfg.DATA_DIR + scfg.GRAF_FILENAME)
+        upload = VkUpload(self.vk_session)
+        attachments = []
+        photo = upload.photo_messages(scfg.DATA_DIR + scfg.GRAF_FILENAME)[0]
+        attachments.append("photo{}_{}".format(photo["owner_id"], photo["id"]))
+        self._send_message_with_attachments(user_id=user_id,
+                                            text=self._reformat_corona_data('Россия', self._get_corona_stat()),
+                                            attachments=attachments)
+
+    def _show_weather_keyboard(self, user_id: int) -> None:
+        """
+        Показывает клавиатуру для выбора периода погоды
+
+        :param user_id:
+        :return:
+        """
+        pass
 
     def _show_corona_local_data(self, user_id: int, region_list: list) -> None:
+        """
+        Показывает статистику коронавируса по региону
+
+        :param user_id:
+        :param region_list:
+        :return:
+        """
         if len(region_list) > 0:
             region = region_list[0].title()
             page = requests.get(scfg.CORONA_STAT_URL + '/country/russia')  # Получаем страницу
             soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
             result = soup.findAll('div', {'class': 'c_search_row'})
+            d = ''
+            rg = cfg.CORONA_REGION_DEFAULT
             for x in result:
                 tmp = x.find('span', 'small').find('a')
                 if region.title() in tmp.getText().split(' '):
-                    print(tmp.get('href'))
+                    rg = tmp.getText()
+                    d = tmp.get('href')
+                    break
+            self._send_message(user_id, self._reformat_corona_data(rg, self._get_corona_stat(d)))
 
     def _show_today_teacher_schedule(self, user_id: int, teacher: str, day_delta: int = 0) -> None:
         """
@@ -625,6 +729,18 @@ class VkBot:
                 return True
         return False
 
+    def _reformat_corona_data(self, region: str, data: tuple) -> str:
+        """
+        Реформат данных коронавируса на 1 день
+
+        :param region:
+        :param data:
+        :return:
+        """
+        status, value, plus = data
+        return cfg.CORONA_STATS_PATTERN.format(status, region, value[0], plus[0], value[1], plus[1],
+                                               value[2], plus[2], value[3], plus[3])
+
     def _reformat_subject_name(self, name: str or None, week_number: int, ignore_weeks: bool = False) -> str | None:
         """
         Реформат названия предмета с проверкой его присутствия на определённой неделе
@@ -787,6 +903,22 @@ class VkBot:
                 random_id=get_random_id(),
                 message=text
             )
+
+    def _send_message_with_attachments(self, user_id: int, text: str = '', attachments: list = list) -> None:
+        """
+        Отправляет сообщение с вложениями
+
+        :param user_id:
+        :param text:
+        :param attachments: Массив с вложениями
+        :return:
+        """
+        self.vk.messages.send(
+            user_id=user_id,
+            attachment=','.join(attachments),
+            random_id=get_random_id(),
+            message=text
+        )
 
     def _update_schedule_file(self) -> None:
         """

@@ -2,6 +2,7 @@ CMD_START = 'начать'
 CMD_SCHEDULE = 'бот'
 CMD_FIND_TEACHER = 'найти'
 CMD_CORONA = 'корона'
+CMD_WEATHER = 'погода'
 
 SPLIT_PAIR_SEPARATOR = ' / '
 WINDOW_SIGNATURE = '--'
@@ -10,6 +11,9 @@ ONE_PAIR_PATTERN = '{}) {}, {}, {}, {}\n'  # Номер, Предмет, Тип,
 ONE_PAIR_SHORT_PATTERN = '{}) {}\n'
 ONE_DAY_HEADER_PATTERN = '\nРасписание на {}:\n'  #
 ONE_DAY_TEACHER_HEADER_PATTERN = '\nРасписание преподавателя {} на {}:\n'  #
+CORONA_STATS_PATTERN = '{}\n\nРегион: {}\nСлучаев: {} ({} за сегодня)\nАктивных: {} ({} за сегодня)\n' \
+                       'Вылечено: {} ({} за сегодня)\nУмерло: {} ({} за сегодня)'
+CORONA_REGION_DEFAULT = 'Не найден, поэтому Россия'
 
 ODD_DAY_PATTERN = 'Расписание на {}, нечётной недели\n'
 EVEN_DAY_PATTERN = 'Расписание на {} чётной недели\n'
@@ -31,6 +35,8 @@ SCHEDULE_SELECT_TEXT = 'Показать расписание ...'
 TEACHER_SELECT_TEXT = 'Выберите преподавателя'
 TEACHER_SELECT_PERIOD_TEXT = 'Показать расписание преподавателя {} ...'
 TEACHER_SELECT_ERROR_TEXT = 'Преподаватель не найден'
+GRAF_HEADER_TEXT = 'Россия - Детальная статистика - коронавирус'
+GRAF_LABEL_TEXT = 'Количество - Миллионы'
 
 INVALID_COMMAND_TEXT = 'Неизвестная команда\nЧто бы получить список команд напиши \'{}\''
 HELP_TEXT = 'Нам никто не поможет :/'
