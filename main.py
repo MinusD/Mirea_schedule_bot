@@ -15,6 +15,7 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.utils import get_random_id
 from vk_api import VkUpload
+
 from PIL import Image, ImageDraw, ImageFont
 from urllib.request import urlopen
 
@@ -28,6 +29,9 @@ import src.cfgs.system_config as scfg
 
 class VkBot:
     def __init__(self) -> None:
+        """
+        Конструктор
+        """
         self.vk_session = vk_api.VkApi(token=scfg.TOKEN)
         self.vk = self.vk_session.get_api()
         self.longpoll = VkLongPoll(self.vk_session)
@@ -40,7 +44,6 @@ class VkBot:
             self._update_schedule_file()
         else:
             self._parse_schedule_file()
-
         Debug('Bot init', key='SRT')
 
     def start_listen(self) -> None:
@@ -111,12 +114,6 @@ class VkBot:
             case cfg.CMD_CORONA:
                 self._show_corona_all_stat(user_id)
                 return
-            case cfg.CMD_WEATHER:
-                self._show_weather_keyboard(user_id)
-                return
-            case cfg.BTN_WEATHER_NOW:
-                self._show_now_weather(user_id)
-                return
 
         combo_cmd = text.split(' ')
         match combo_cmd[0]:
@@ -145,9 +142,12 @@ class VkBot:
         if str(user_id) in self.users_to_set_group:
             self._edit_user_group(user_id, text)
             return
+
         if str(user_id) in self.users_to_set_teacher:
             self._show_teacher_period_keyboard(user_id, text)
             return
+
+        Debug(f'Command {text} not found for id: {user_id}', key='CNF')
         self._send_message(user_id, cfg.INVALID_COMMAND_TEXT.format(cfg.BTN_HELP.title()))
 
     def _get_week_schedule(self, group: str, date: datetime.datetime, with_reformat: bool = True) -> list:
@@ -182,6 +182,7 @@ class VkBot:
                 out[i][j][1] = self._reformat_double_pair(out[i][j][1])
                 out[i][j][2] = self._reformat_double_pair(out[i][j][2])
                 out[i][j][3] = self._reformat_double_pair(out[i][j][3])
+        Debug(f'Getting {group} week schedule', key='GET')
         return out
 
     def _get_day_schedule(self, group: str, date: datetime.datetime) -> list:
@@ -196,6 +197,7 @@ class VkBot:
         week_index = date.isocalendar().weekday - 1
         if week_index == 6:
             return [[] * 4] * 6
+        Debug(f'Getting {group} day schedule', key='GET')
         return week[week_index]
 
     def _get_user_group(self, user_id: int) -> str or None:
@@ -207,6 +209,7 @@ class VkBot:
         """
         group = Database().fetch_one(table=scfg.TABLE_NAME, condition=f'user_id = {user_id}')
         if group:
+            Debug(f'Find {user_id} group: {group}', key='FND')
             return group[1]
         else:
             self._send_message(user_id, cfg.CURRENT_GROUP_ERROR_TEXT.format(cfg.CMD_SCHEDULE.title()))
@@ -218,6 +221,7 @@ class VkBot:
 
         :return: учебная неделя
         """
+        Debug(f'Getting current week', key='GET')
         return datetime.datetime.now().isocalendar().week + scfg.WEEK_DELTA
 
     def _get_group_column(self, group) -> int or None:
@@ -262,7 +266,9 @@ class VkBot:
                     if tmp[0].split(' ')[0] == teacher:
                         result.add(tmp[0] if tmp[0][-1] == '.' else tmp[0] + '.')  # Исправление косяков расписания
                     elif tmp[-1].split(' ')[0] == teacher:
+
                         result.add(tmp[-1] if tmp[-1][-1] == '.' else tmp[-1] + '.')
+        Debug(f'Getting {teacher} fullname', key='GET')
         return result
 
     def _get_teacher_week_schedule(self, teacher: str, date: datetime.datetime, with_reformat: bool = True) -> list:
@@ -316,7 +322,7 @@ class VkBot:
 
     def _get_day_teacher_schedule(self, teacher: str, date: datetime.datetime) -> list:
         """
-        Возращает расписание преподавателя на переданный день
+        Возвращает расписание преподавателя на переданный день
 
         :param teacher:
         :param date:
@@ -357,7 +363,6 @@ class VkBot:
         page = requests.get(scfg.CORONA_STAT_URL + '/country/russia')  # Получаем страницу
         soup = BeautifulSoup(page.text, "html.parser")  # Парсим её
         result = soup.find('table', {'class': 'table table-bordered small'}).findAll('tr')
-        # days = active = cured = died = cases = stats = []
         days = []
         active = []
         cured = []
@@ -365,6 +370,7 @@ class VkBot:
         cases = []
         stats = []
         ml = 1000000
+
         for i in range(1, 11):
             days.append(result[i].find('th').getText())
             for a in result[i].findAll('td'):
@@ -377,113 +383,14 @@ class VkBot:
             died.append(stats[i] / ml)
         for i in range(3, len(stats), 4):
             cases.append(stats[i] / ml)
+
         days = list(reversed(days))
         active = list(reversed(active))
         cured = list(reversed(cured))
         died = list(reversed(died))
         cases = list(reversed(cases))
+
         return days, active, cured, died, cases
-
-    def _get_wind_slug(self, speed: float) -> str:
-        """
-        Возвращает словесное название  ветра по шкале Бофорта
-
-        :param speed:
-        :return:
-        """
-        s = 'Ураган'
-        if speed <= 0.2:
-            s = 'Штиль'
-        elif speed <= 1.5:
-            s = 'Тихий'
-        elif speed <= 3.3:
-            s = 'Лёгкий'
-        elif speed <= 5.4:
-            s = 'Слабый'
-        elif speed <= 7.9:
-            s = 'Умеренный'
-        elif speed <= 10.7:
-            s = 'Свежий'
-        elif speed <= 13.8:
-            s = 'Сильный'
-        elif speed <= 17.1:
-            s = 'Крепкий'
-        elif speed <= 20.7:
-            s = 'Очень крепкий'
-        elif speed <= 24.4:
-            s = 'Шторм'
-        elif speed <= 28.4:
-            s = 'Сильный шторм'
-        elif speed <= 32.6:
-            s = 'Жестокий шторм'
-        return s
-
-    def _get_wind_deg_slug(self, deg: int) -> str:
-        """
-        Возращает буквенное направление ветра
-
-        :param deg: Угол ветра
-        :return:
-        """
-        s = 'северный'
-        if deg <= 22.5:
-            s = 'северный'
-        elif deg <= 67.5:
-            s = 'северо-восточный'
-        elif deg <= 112.5:
-            s = 'восточный'
-        elif deg <= 157.5:
-            s = 'юго-восточный'
-        elif deg <= 202.5:
-            s = 'южный'
-        elif deg <= 247.5:
-            s = 'юго-западный'
-        elif deg <= 292.5:
-            s = 'западный'
-        elif deg <= 292.5:
-            s = 'северо-западный'
-        return s
-
-    def _show_now_weather(self, user_id: int) -> None:
-        """
-        Показывает текущую погоду в Москве
-
-        :param user_id:
-        :return:
-        """
-        upload = VkUpload(self.vk_session)
-        attachments = []
-        image = Image.open('src/assets/weather_pattern.jpg')
-        # img = image.resize((400, 500))
-        img = image.resize((400, 260))
-        img = img.convert('RGB')
-        idraw = ImageDraw.Draw(img)
-        title = ImageFont.truetype(font='src/assets/lato.ttf', size=30)
-        font = ImageFont.truetype(font='src/assets/lato.ttf', size=18)
-        # title2 = ImageFont.truetype(size=30)
-        idraw.text((10, 10), 'Погода в Москве', font=title, fill="white")
-        response = requests.get("http://api.openweathermap.org/data/2.5/weather",
-                                params={'q': 'moscow,ru', 'units': 'metric', 'APPID': scfg.WEATHER_TOKEN, 'lang': 'ru'})
-        info = response.json()
-        img_name = info['weather'][0]['icon']
-        im = Image.open(urlopen('https://openweathermap.org/img/wn/{}@4x.png'.format(img_name)))
-        img.paste(im, (95, 20), im.convert('RGBA'))
-        status = info['weather'][0]['description'].capitalize()
-        temp = str(int(info['main']['temp_min'])) + ' - ' + str(int(info['main']['temp_max']))
-        pressure = str(int(float(info['main']['pressure']) / 1.33))
-        humidity = str(info['main']['humidity'])
-        wind_speed = info['wind']['speed']
-        wind_slug = self._get_wind_slug(float(wind_speed)).lower()
-        wind_deg_slug = self._get_wind_deg_slug(info['wind']['speed'])
-        weather = cfg.WEATHER_DATA_PATTERN.format(status, temp, pressure, humidity, wind_slug, wind_speed,
-                                                  wind_deg_slug)
-        idraw.text((10, 185), weather, font=font, fill="white")
-        img.save('data/weather_card.png')
-
-        photo = upload.photo_messages(scfg.DATA_DIR + 'weather_card.png')[0]
-        attachments.append("photo{}_{}".format(photo["owner_id"], photo["id"]))
-
-        self._send_message_with_attachments(user_id=user_id, text='Сейчас', attachments=attachments)
 
     def _show_corona_all_stat(self, user_id: int) -> None:
         """
@@ -514,21 +421,6 @@ class VkBot:
         self._send_message_with_attachments(user_id=user_id,
                                             text=self._reformat_corona_data('Россия', self._get_corona_stat()),
                                             attachments=attachments)
-
-    def _show_weather_keyboard(self, user_id: int) -> None:
-        """
-        Показывает клавиатуру для выбора периода погоды
-
-        :param user_id:
-        :return:
-        """
-        keyboard = VkKeyboard(one_time=True)
-        keyboard.add_button(cfg.BTN_WEATHER_NOW, color=VkKeyboardColor.PRIMARY)
-        keyboard.add_button(cfg.BTN_WEATHER_TODAY, color=VkKeyboardColor.POSITIVE)
-        keyboard.add_button(cfg.BTN_WEATHER_TOMORROW, color=VkKeyboardColor.POSITIVE)
-        keyboard.add_line()
-        keyboard.add_button(cfg.BTN_WEATHER_FIVE_DAYS, color=VkKeyboardColor.POSITIVE)
-        self._send_message(user_id, text=cfg.WEATHER_SELECT_TEXT, custom_keyboard=keyboard)
 
     def _show_corona_local_data(self, user_id: int, region_list: list) -> None:
         """
@@ -590,16 +482,26 @@ class VkBot:
             self._send_message(user_id, result)
 
     def _show_teacher_period_keyboard(self, user_id: int, teacher: str) -> None:
+        """
+        Показывает клавиатуру для выбора периода расписания преподавателя
+
+        :param user_id:
+        :param teacher: Полное имя преподавателя
+        :return:
+        """
         tmp = teacher.split(' ')
         if len(tmp) == 2:
             teacher = tmp[0].title() + ' ' + tmp[1].upper()
             if self._validate_teacher_name(teacher):
+                Debug(f'Show period for {teacher}', key='SHW')
+                # Создаём клавиатуру
                 keyboard = VkKeyboard(one_time=True)
                 keyboard.add_button(cfg.BTN_SCHEDULE_TODAY, color=VkKeyboardColor.POSITIVE)
                 keyboard.add_button(cfg.BTN_SCHEDULE_TOMORROW, color=VkKeyboardColor.NEGATIVE)
                 keyboard.add_line()
                 keyboard.add_button(cfg.BTN_SCHEDULE_WEEK, color=VkKeyboardColor.PRIMARY)
                 keyboard.add_button(cfg.BTN_SCHEDULE_NEXT_WEEK, color=VkKeyboardColor.PRIMARY)
+
                 self._clear_wait_lists(user_id)
                 self._add_user_to_get_teacher_list(user_id, teacher)
                 self._send_message(user_id, text=cfg.TEACHER_SELECT_PERIOD_TEXT.format(teacher),
@@ -649,6 +551,13 @@ class VkBot:
         self._send_message(user_id, cfg.HELP_TEXT)
 
     def _show_week_day_schedule(self, user_id: int, day: str) -> None:
+        """
+        Показывает расписание на определённый день недели
+
+        :param user_id:
+        :param day:
+        :return:
+        """
         group = self._get_user_group(user_id)
         if group:
             date = datetime.datetime.now()
@@ -687,6 +596,7 @@ class VkBot:
         group = self._get_user_group(user_id)
         if group:
             schedule = self._get_day_schedule(group, now)
+            Debug(f'Show {group} tomorrow schedule for id: {user_id}', key='SHW')
             self._send_message(user_id=user_id, text=self._reformat_day_schedule(schedule, now))
 
     def _show_week_schedule(self, user_id: int, week_delta: int = 0) -> None:
@@ -705,6 +615,7 @@ class VkBot:
             for i in range(6):
                 result += self._reformat_day_schedule(schedule[i], date=day_date, week_format=True)
                 day_date += datetime.timedelta(days=1)
+            Debug(f'Show {group} week schedule for id: {user_id}', key='SHW')
             self._send_message(user_id, result)
 
     def _show_current_week(self, user_id: int) -> None:
@@ -793,9 +704,6 @@ class VkBot:
             self._send_message(user_id, cfg.INVALID_GROUP_TEXT)
             Debug(f'Invalid group format {group_slug} uid: {user_id}', key='INV')
 
-        # Debug('from {} text = \'{}\''.format(event.user_id, event.text), key='MSG')
-        # self._command_handler(event.user_id, event.text.lower())
-
     def _clear_wait_lists(self, user_id: int) -> None:
         """
         Убирает пользователя из списка ожидания
@@ -821,6 +729,7 @@ class VkBot:
             for j in range(2, len(self.schedule_data[i])):
                 tmp = self.schedule_data[i][j].split('\n')  # для сдвоенных пар
                 if len(tmp) > 0:
+                    # Исправляем отсутствие точки у некоторых преподавателей
                     t1 = tmp[0] if tmp[0][-1] == '.' else tmp[0] + '.'
                     t2 = tmp[-1] if tmp[-1][-1] == '.' else tmp[-1] + '.'
                     if t1 == teacher or t2 == teacher:
@@ -859,15 +768,18 @@ class VkBot:
 
         :param name:
         :param week_number:
+        :param ignore_weeks:
         :return:
         """
+
         custom_week_pattern = r'кр. ([\d\,]+) н. ([^\\]+)'  # Кроме каких-то недель
         custom_week_range_pattern = r'(\d+\-\d+) н. ([^\\]+)'  # Диапазон
         custom_week_is_set_pattern = r'([\d\,]+) н. ([^\\]+)'  # Включая эти недели
         custom_week_dirt_pattern = r'…'  # Заглушки в расписании
-        # print(name, type(name), len(name))
+
         if name and name != 'None':  # Пара есть?
             data = name.split('\n')
+            # Цикл, для сдвоенных пар
             for i in range(len(data)):
                 if not ignore_weeks:
                     kr = re.search(custom_week_pattern, data[i])  # Проверяем, есть ли паттерн КР
@@ -921,6 +833,9 @@ class VkBot:
 
         :param data:
         :param date:
+        :param week_format:
+        :param with_header:
+        :param teacher_header:
         :return:
         """
 
@@ -944,7 +859,6 @@ class VkBot:
                                            data[i][2] != '' else cfg.VOID_SIGNATURE,
                         str(data[i][3])) if data[i][3] != cfg.WINDOW_SIGNATURE and \
                                             data[i][3] != '' else cfg.VOID_SIGNATURE
-                    # result += cfg.ONE_PAIR_SHORT_PATTERN.format(i + 1, cfg.WINDOW_SIGNATURE)
                 else:
                     result += cfg.ONE_PAIR_SHORT_PATTERN.format(i + 1, cfg.WINDOW_SIGNATURE)
             else:
@@ -972,7 +886,7 @@ class VkBot:
 
         :param user_id: ID пользователя
         :param text: Текс сообщения
-        :param keyboard: 0 - Без клавиатуры(не менять), 1 - Стандартная клавиатура, 2 - Дополнительная(Настройки)
+        :param keyboard: 0 - Без клавиатуры(не менять), 1 - Стандартная клавиатура
         :return:
         """
 
@@ -987,19 +901,6 @@ class VkBot:
             keyboard.add_button(cfg.BTN_WHAT_WEEK.title(), color=VkKeyboardColor.SECONDARY)
             keyboard.add_button(cfg.BTN_WHAT_GROUP.title(), color=VkKeyboardColor.SECONDARY)
             keyboard.add_button(cfg.BTN_HELP.title(), color=VkKeyboardColor.SECONDARY)
-            # keyboard.add_button(cfg.BTN_SETTINGS.title(), color=VkKeyboardColor.SECONDARY)
-
-            # keyboard.add_button('Начать', color=VkKeyboardColor.NEGATIVE)
-            # keyboard = VkKeyboard(one_time=True)
-            #   # переход на вторую строку
-            # keyboard.add_button('ИКБО-30-21', color=VkKeyboardColor.POSITIVE)
-            # keyboard.add_button('ИКБО-10-21', color=VkKeyboardColor.POSITIVE)
-            # keyboard.add_button('ИКБО-00-21', color=VkKeyboardColor.POSITIVE)
-        elif keyboard == 2:
-            keyboard = VkKeyboard(one_time=True)
-            keyboard.add_button('321', color=VkKeyboardColor.NEGATIVE)
-            keyboard.add_line()  # переход на вторую строку
-            keyboard.add_button('Зелёная кнопка', color=VkKeyboardColor.POSITIVE)
         if custom_keyboard:
             keyboard = custom_keyboard
         if keyboard:
@@ -1043,6 +944,7 @@ class VkBot:
         result = soup.find(string="Институт информационных технологий").find_parent("div").find_parent("div").findAll(
             'a', {'class': 'uk-link-toggle'})
         course_pattern = r'([1-3]) курс'
+
         for x in result:
             course = x.find('div', 'uk-link-heading').text.lower().strip()
             course_number = re.match(course_pattern, course)
@@ -1053,6 +955,7 @@ class VkBot:
                 resp = requests.get(link)  # запрос по ссылке
                 f.write(resp.content)  # Записываем контент в файл
                 f.close()
+
         self.last_schedule_file_update = time.time()
         Debug('Update schedule files', key='UPD')
         self._parse_schedule_file()
@@ -1069,7 +972,6 @@ class VkBot:
                 f'{scfg.DATA_DIR}{scfg.SCHEDULE_BASE_NAME}{c + 1}.xlsx')  # открытие файла
             sheet = book.active  # активный лист
             num_cols = sheet.max_column  # количество столбцов
-            # num_rows = sheet.max_row  # количество строк
             last_group_cell = 0  # Сколько прошло ячеек от последней группы
             for i in range(6, num_cols):
                 if last_group_cell >= 4:  # Если после группы прошло 4 ячейки, ждём следующей группы
