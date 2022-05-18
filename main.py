@@ -51,7 +51,7 @@ class VkBot:
         """
         Debug('Start listen', key='SRT')
         for event in self.longpoll.listen():
-            if event.type == VkEventType.MESSAGE_NEW and event.text and event.to_me:
+            if event.type == VkEventType.MESSAGE_NEW and event.text and event.to_me and event.from_user:
                 Debug('from {} text = \'{}\''.format(event.user_id, event.text), key='MSG')
                 self._command_handler(event.user_id, event.text.lower())
 
