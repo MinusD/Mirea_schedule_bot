@@ -445,6 +445,12 @@ class VkBot:
         return s
 
     def _show_now_weather(self, user_id: int) -> None:
+        """
+        Показывает текущую погоду в Москве
+
+        :param user_id:
+        :return:
+        """
         upload = VkUpload(self.vk_session)
         attachments = []
         image = Image.open('src/assets/weather_pattern.jpg')
@@ -459,7 +465,6 @@ class VkBot:
         response = requests.get("http://api.openweathermap.org/data/2.5/weather",
                                 params={'q': 'moscow,ru', 'units': 'metric', 'APPID': scfg.WEATHER_TOKEN, 'lang': 'ru'})
         info = response.json()
-        pattern = '{}, температура: {}°C\nДавление: {} мм рт. сб., влажность: {}%\nВетер: {}, {} м/с, {}'
         img_name = info['weather'][0]['icon']
         im = Image.open(urlopen('https://openweathermap.org/img/wn/{}@4x.png'.format(img_name)))
         img.paste(im, (95, 20), im.convert('RGBA'))
@@ -470,16 +475,15 @@ class VkBot:
         wind_speed = info['wind']['speed']
         wind_slug = self._get_wind_slug(float(wind_speed)).lower()
         wind_deg_slug = self._get_wind_deg_slug(info['wind']['speed'])
-        weather = pattern.format(status, temp, pressure, humidity, wind_slug, wind_speed, wind_deg_slug)
+        weather = cfg.WEATHER_DATA_PATTERN.format(status, temp, pressure, humidity, wind_slug, wind_speed,
+                                                  wind_deg_slug)
         idraw.text((10, 185), weather, font=font, fill="white")
-
         img.save('data/weather_card.png')
 
         photo = upload.photo_messages(scfg.DATA_DIR + 'weather_card.png')[0]
         attachments.append("photo{}_{}".format(photo["owner_id"], photo["id"]))
 
         self._send_message_with_attachments(user_id=user_id, text='Сейчас', attachments=attachments)
-
 
     def _show_corona_all_stat(self, user_id: int) -> None:
         """
