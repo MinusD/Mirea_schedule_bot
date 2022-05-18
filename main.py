@@ -771,12 +771,10 @@ class VkBot:
         :param ignore_weeks:
         :return:
         """
-
         custom_week_pattern = r'кр. ([\d\,]+) н. ([^\\]+)'  # Кроме каких-то недель
         custom_week_range_pattern = r'(\d+\-\d+) н. ([^\\]+)'  # Диапазон
         custom_week_is_set_pattern = r'([\d\,]+) н. ([^\\]+)'  # Включая эти недели
         custom_week_dirt_pattern = r'…'  # Заглушки в расписании
-
         if name and name != 'None':  # Пара есть?
             data = name.split('\n')
             # Цикл, для сдвоенных пар
@@ -889,7 +887,6 @@ class VkBot:
         :param keyboard: 0 - Без клавиатуры(не менять), 1 - Стандартная клавиатура
         :return:
         """
-
         if keyboard == 1:
             keyboard = VkKeyboard(one_time=False)
             keyboard.add_button(cfg.BTN_SCHEDULE_TODAY, color=VkKeyboardColor.POSITIVE)
@@ -903,19 +900,22 @@ class VkBot:
             keyboard.add_button(cfg.BTN_HELP.title(), color=VkKeyboardColor.SECONDARY)
         if custom_keyboard:
             keyboard = custom_keyboard
-        if keyboard:
-            self.vk.messages.send(
-                user_id=user_id,
-                random_id=get_random_id(),
-                keyboard=keyboard.get_keyboard(),
-                message=text
-            )
-        else:
-            self.vk.messages.send(
-                user_id=user_id,
-                random_id=get_random_id(),
-                message=text
-            )
+        try:
+            if keyboard:
+                self.vk.messages.send(
+                    user_id=user_id,
+                    random_id=get_random_id(),
+                    keyboard=keyboard.get_keyboard(),
+                    message=text
+                )
+            else:
+                self.vk.messages.send(
+                    user_id=user_id,
+                    random_id=get_random_id(),
+                    message=text
+                )
+        except:
+            Debug(f'Send message error id: {user_id}', key='ERR')
 
     def _send_message_with_attachments(self, user_id: int, text: str = '', attachments: list = list) -> None:
         """
@@ -926,12 +926,15 @@ class VkBot:
         :param attachments: Массив с вложениями
         :return:
         """
-        self.vk.messages.send(
-            user_id=user_id,
-            attachment=','.join(attachments),
-            random_id=get_random_id(),
-            message=text
-        )
+        try:
+            self.vk.messages.send(
+                user_id=user_id,
+                attachment=','.join(attachments),
+                random_id=get_random_id(),
+                message=text
+            )
+        except:
+            Debug(f'Send message error id: {user_id}', key='ERR')
 
     def _update_schedule_file(self) -> None:
         """
@@ -944,7 +947,6 @@ class VkBot:
         result = soup.find(string="Институт информационных технологий").find_parent("div").find_parent("div").findAll(
             'a', {'class': 'uk-link-toggle'})
         course_pattern = r'([1-3]) курс'
-
         for x in result:
             course = x.find('div', 'uk-link-heading').text.lower().strip()
             course_number = re.match(course_pattern, course)
@@ -955,7 +957,6 @@ class VkBot:
                 resp = requests.get(link)  # запрос по ссылке
                 f.write(resp.content)  # Записываем контент в файл
                 f.close()
-
         self.last_schedule_file_update = time.time()
         Debug('Update schedule files', key='UPD')
         self._parse_schedule_file()
