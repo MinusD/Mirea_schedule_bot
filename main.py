@@ -1,30 +1,27 @@
 # Встроенные библиотеки
-import datetime
-from typing import Tuple, Any, List
+import re
+import time
+from typing import Any
 
+import matplotlib.pyplot as plt
 import openpyxl
 import requests
-import time
-import re
-import matplotlib.pyplot as plt
-from bs4 import BeautifulSoup
 
 # Сторонние библиотеки
 import vk_api
-from vk_api.longpoll import VkLongPoll, VkEventType
-from vk_api.keyboard import VkKeyboard, VkKeyboardColor
-from vk_api.utils import get_random_id
+from bs4 import BeautifulSoup
 from vk_api import VkUpload
+from vk_api.keyboard import VkKeyboard, VkKeyboardColor
+from vk_api.longpoll import VkLongPoll, VkEventType
+from vk_api.utils import get_random_id
 
-from PIL import Image, ImageDraw, ImageFont
-from urllib.request import urlopen
+# Конфиги
+import src.cfgs.main_config as cfg
+import src.cfgs.system_config as scfg
 
 # Самописные модули
 from src.helper_module import *
 from src.sql_database import *
-
-import src.cfgs.main_config as cfg
-import src.cfgs.system_config as scfg
 
 
 class VkBot:
@@ -175,6 +172,7 @@ class VkBot:
             if len(tmp) == 6:
                 out.append(tmp)
                 tmp = []
+
         for i in range(len(out)):
             for j in range(6):
                 out[i][j][0] = self._reformat_subject_name(out[i][j][0], week_number=week,
@@ -285,6 +283,7 @@ class VkBot:
         week_even = (week + 1) % 2  # Является ли неделя чётной
         out = []
         tmp = []
+
         for j in range(2 + week_even, len(self.schedule_data[0]), 2):
             para = []  # одна пара
             for i in range(2, len(self.schedule_data), 4):  # Слева на права
@@ -313,6 +312,7 @@ class VkBot:
             if (j - week_even) % 12 == 0:
                 out.append(tmp)
                 tmp = []
+
         for i in range(len(out)):
             for j in range(6):
                 if len(out[i][j]) > 1:

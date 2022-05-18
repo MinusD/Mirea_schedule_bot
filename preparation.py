@@ -14,3 +14,4 @@ if __name__ == '__main__':
     open(cfg.DATA_DIR + cfg.LOG_FILENAME, 'w').close()
     db = Database()
     db.create_table(cfg.TABLE_NAME, [['user_id', 'INTEGER'], ['group_slug', 'VARCHAR(30)']])
+    del db
