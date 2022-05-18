@@ -1,11 +1,10 @@
-TOKEN: str = 'dfb468c2e5cf615a4c9f534eba0ded63bd20d15a4576743f1154f15ccf86bdd2296dc24e251d91117a043'
+TOKEN: str = ''
 MIREA_SCHEDULE_URL: str = 'https://www.mirea.ru/schedule/'
 CORONA_STAT_URL: str = 'https://coronavirusstat.ru'
-DEBUG_MODE: bool = True
-LOG_MODE: bool = True
-UPDATE_SCHEDULE_FILE_ON_START: bool = True
-ADMIN_VK_ID: int = 382889632
-WEEK_DELTA: int = -5
+DEBUG_MODE: bool = True  # Выводит действия
+LOG_MODE: bool = True  # Логирует ключевые действия
+UPDATE_SCHEDULE_FILE_ON_START: bool = True  # Запрашивать ли расписания с сайта при запуске
+WEEK_DELTA: int = -5  # Номер учебной недели по сравнению с неделей в году
 
 GROUP_PATTERN: str = r'\w{4}-\d{2}-\d{2}'  # Паттерн группы
 
