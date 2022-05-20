@@ -76,7 +76,6 @@ class VkBot:
                         self._show_teacher_week_schedule(user_id, self.users_to_get_teacher[i][1], 1)
                 del self.users_to_get_teacher[i]
                 return
-
         match text:
             case cfg.CMD_START:
                 user_data = self.vk.users.get(user_id=user_id)[0]
@@ -997,4 +996,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    while True:
+        try:
+            main()
+        finally:
+            Debug('Finally in main', key='ERR')
