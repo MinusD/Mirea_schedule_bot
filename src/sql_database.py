@@ -1,11 +1,11 @@
 # import psycopg2
 import sqlite3 as sql
-import src.cfgs.system_config as cfg
+import src.cfgs.system_config as scfg
 
 
 class Database:
     def __init__(self) -> None:
-        self.conn = sql.connect(cfg.DATA_DIR + cfg.DATABASE_FILENAME)
+        self.conn = sql.connect(scfg.DATA_DIR + scfg.DATABASE_FILENAME)
         self.cursor = self.conn.cursor()
 
     def create_table(self, table_name: str, columns: [[int, str]]) -> None:

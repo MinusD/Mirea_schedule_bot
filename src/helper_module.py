@@ -1,5 +1,5 @@
 import datetime
-from src.cfgs import system_config as scfg
+import src.cfgs.system_config as scfg
 
 
 class Log:
